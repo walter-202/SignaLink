@@ -3,9 +3,8 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "La Voz de tus Manos | Avatar 3D",
-  description:
-    "Prototipo para visualizar modelos 3D y explorar sus clips de animación.",
+  title: "La Voz de tus Manos | Atención accesible",
+  description: "Prototipo de atención accesible con apoyo de Lengua de Señas Boliviana.",
 };
 
 export default function RootLayout({
