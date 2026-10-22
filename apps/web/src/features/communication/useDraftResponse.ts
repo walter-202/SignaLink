@@ -1,3 +1,4 @@
+'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { DraftResponseState, InputMode, QuickPhrase, UseDraftResponseProps } from './draft-response.types';
 import { DEFAULT_QUICK_PHRASES } from './quickPhrases.data';
@@ -146,3 +147,4 @@ export function useDraftResponse(
     quickPhrases: DEFAULT_QUICK_PHRASES,
   };
 }
+
