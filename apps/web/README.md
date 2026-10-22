@@ -15,14 +15,15 @@ Abre `http://localhost:3000`. La ruta `/` redirige a `/atender`.
 
 ## Vistas
 
-- **`/atender`**: trámite activo, cámara con vista previa y landmarks locales opcionales, captura simulada con edición y confirmación, conversación, respuestas escritas o dictadas, frases frecuentes, observaciones y vista de avatar.
-- **`/historial`**: búsqueda, filtros por estado y fecha, paginación, resumen de la conversación, detalle, reapertura confirmada y modal con la conversación completa.
+- **`/login`**: acceso de personal con correo y contraseña de Supabase Auth. La aplicación no ofrece registro público.
+- **`/atender`**: atención activa guardada, cámara con vista previa y landmarks locales opcionales, captura simulada con edición y confirmación, conversación, respuestas escritas o dictadas, frases frecuentes, observaciones y vista de avatar.
+- **`/historial`**: búsqueda, filtros por estado y fecha, paginación, resumen de conversaciones guardadas, detalle y reapertura confirmada.
 
 La interfaz se adapta a móvil, incluye navegación por teclado, etiquetas para controles, estados accesibles, opción de contraste alto y respeto por `prefers-reduced-motion`.
 
 ## Límites de la demostración
 
-La cámara usa `getUserMedia` a través de un adaptador y solo se activa con una acción explícita. La vista previa no se graba, no se envía a un servidor y se libera al detenerla, al cambiar de atención o al finalizar la sesión. Si el permiso se deniega o no hay cámara, la persona puede continuar con la captura de demostración o escribir la respuesta. La captura LSB sigue usando una propuesta fija; la app detecta landmarks localmente con MediaPipe, pero no hay clasificador ni traducción LSB conectados. El dictado ya usa Web Speech API del navegador cuando está disponible, con `es-BO`; el texto final se agrega al borrador y requiere revisión antes del envío. La aplicación no envía el audio a un endpoint propio, aunque el navegador o su proveedor pueden procesarlo según su implementación y políticas. Si el dictado no está disponible o falla, la persona puede escribir la respuesta. Los registros se guardan solo en el estado de Zustand mientras el documento está abierto, no usan almacenamiento del navegador y vuelven al fixture al recargar. El avatar de imagen es ilustrativo y no genera señas verificadas. Se puede cargar un `.glb` de hasta 25 MB para probar localmente un modelo y sus clips; el archivo no se envía a un servidor.
+La cámara usa `getUserMedia` a través de un adaptador y solo se activa con una acción explícita. La vista previa no se graba, no se envía a un servidor y se libera al detenerla, al cambiar de atención o al finalizar la sesión. Si el permiso se deniega o no hay cámara, la persona puede continuar con la captura de demostración o escribir la respuesta. La captura LSB sigue usando una propuesta fija; la app detecta landmarks localmente con MediaPipe, pero no hay clasificador ni traducción LSB conectados. El dictado usa Web Speech API del navegador cuando está disponible, con `es-BO`; el texto final se agrega al borrador y requiere revisión antes del envío. La aplicación no envía el audio a un endpoint propio, aunque el navegador o su proveedor pueden procesarlo según su implementación y políticas. Si el dictado no está disponible o falla, la persona puede escribir la respuesta. Las atenciones, respuestas, mensajes revisados y observaciones se guardan en Supabase. No se almacenan frames, imágenes, video ni audio de la cámara. El avatar de imagen es ilustrativo y no genera señas verificadas. Se puede cargar un `.glb` de hasta 25 MB para probar localmente un modelo y sus clips; el archivo no se envía a un servidor.
 
 Las imágenes del avatar son recursos generados para la interfaz de demostración. No representan personas usuarias ni contenido lingüístico validado.
 
@@ -56,11 +57,13 @@ La interfaz usa Next.js, TypeScript, Tailwind CSS 4, configuración compatible c
 
 ## Conexión con Supabase
 
-El cliente oficial de Supabase está preparado para Next.js App Router. `src/lib/supabase/client.ts` crea el cliente de navegador y `src/lib/supabase/server.ts` crea el cliente de servidor con cookies compatibles con SSR. Ambos usan únicamente la URL del proyecto y una publishable key; nunca se expone una clave `service_role` o `sb_secret`.
+El inicio de sesión y la sesión SSR usan `@supabase/ssr`, cookies y `getClaims()` para verificar al personal en páginas protegidas. `src/proxy.ts` renueva la sesión y protege `/atender` y `/historial`; el layout vuelve a verificar la identidad. El cliente del navegador solo usa la URL y publishable key. Nunca se incluye una clave `service_role` o `sb_secret` en el frontend.
 
-Para enlazar un proyecto, copia `apps/web/.env.example` a `apps/web/.env.local` y reemplaza `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` con los valores del diálogo **Connect** de Supabase. Después reinicia `pnpm dev:web`. No es necesario configurar estas variables para ejecutar la demostración actual.
+El esquema inicial está en `supabase/migrations/`. Se aplicó al proyecto `la-voz-de-tus-manos` en `sa-east-1`. `attentions` y `attention_messages` tienen RLS habilitado; cada usuario autenticado solo ve sus propios registros. Los mensajes no se pueden modificar desde la app y no se permite leer ni escribir como usuario anónimo. Las tablas solo guardan texto y referencias de trámites.
 
-La conexión todavía no guarda atenciones ni conversaciones. Esa persistencia se añadirá cuando se definan la retención, el acceso y las reglas RLS para datos potencialmente sensibles; hasta entonces se conservan los fixtures y el estado en memoria.
+Para ejecutar localmente, copia `apps/web/.env.example` a `apps/web/.env.local` y configura `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` con los valores del diálogo **Connect**; luego reinicia `pnpm dev:web`. El archivo local actual apunta al proyecto enlazado y está excluido por Git. Las cuentas se crean o invitan desde **Supabase Dashboard → Authentication → Users**; después el personal inicia sesión en `/login`. No compartas claves secretas para que otra persona pueda ejecutar la app.
+
+La política de RLS actual separa la información por cuenta de personal. Para compartir atenciones entre varias cuentas de una misma institución se añadirá un modelo explícito de organización y membresías antes de abrir ese acceso; no se usa una política amplia para todos los usuarios autenticados.
 
 ## Servicios y siguiente integración
 
@@ -71,8 +74,9 @@ La cámara sigue un puerto equivalente (`CameraService`) con un adaptador de `ge
 Las siguientes integraciones se añadirán detrás de contratos equivalentes, en este orden:
 
 1. **Clasificador LSB:** adaptador ONNX Runtime Web que consuma la secuencia de 30 × 138 features y devuelva propuestas con modelo/versión y estado revisable. La UI no tratará resultados como traducción confirmada.
-2. **Sesiones e historial:** repositorio de aplicación implementado en servidor, con política de retención y permisos definida antes de persistir conversaciones.
-3. **Persistencia y contenido:** Supabase para sesiones, catálogo de modelos y videos LSB, manteniendo la vista previa de cámara fuera del almacenamiento por defecto.
+2. **Colaboración institucional:** organizaciones, membresías administradas y permisos para que el personal autorizado comparta el historial sin mezclar instituciones.
+3. **Privacidad operativa:** acordar retención y borrado de conversaciones antes de un piloto con datos reales; ahora se guarda texto de conversación y notas por cuenta.
+4. **Persistencia y contenido:** catálogo versionado de modelos y recursos LSB, manteniendo la vista previa de cámara fuera del almacenamiento por defecto.
 
 El dictado del navegador puede usar procesamiento del proveedor del navegador; no es una garantía de inferencia local. Los modelos LSB y cualquier API institucional se incorporarán después de definir privacidad, licencias de datos y contratos de entrada/salida.
 

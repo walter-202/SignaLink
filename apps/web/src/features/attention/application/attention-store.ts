@@ -1,8 +1,15 @@
 "use client";
 
 import { create } from "zustand";
-import { MOCK_HISTORY, MOCK_HISTORY_ANCHOR } from "@/features/procedure-history/mocks/history.mock";
 import type { ConversationMessage, HistoryRecord } from "@/features/procedure-history/domain/types";
+import {
+  addAttentionMessage,
+  createAttentionRecord,
+  finishAttentionRecord,
+  listAttentionRecords,
+  reopenAttentionRecord,
+  updateAttentionRecord,
+} from "../infrastructure/attention-repository";
 import { recognizeMockSign } from "./mock-recognition-service";
 import { procedureNotesSchema, replyTextSchema } from "./validation";
 
@@ -21,35 +28,34 @@ interface AttentionState {
   draftError: string | null;
   notes: string;
   notesError: string | null;
+  notesDirty: boolean;
   mode: ConversationMode;
   messages: ConversationMessage[];
+  isReady: boolean;
+  isLoading: boolean;
+  isSaving: boolean;
+  syncError: string | null;
+  loadRecords: () => Promise<void>;
+  clearSyncError: () => void;
   startCapture: () => Promise<void>;
   cancelCapture: () => void;
-  confirmCapture: () => void;
+  confirmCapture: () => Promise<void>;
   setCaptureText: (value: string) => void;
   retryCapture: () => Promise<void>;
   clearCapture: () => void;
   setFailNextRecognition: (enabled: boolean) => void;
   setDraft: (value: string) => void;
-  sendReply: (source?: ConversationMessage["source"]) => boolean;
+  sendReply: (source?: ConversationMessage["source"]) => Promise<boolean>;
   setNotes: (value: string) => void;
+  saveNotes: () => Promise<void>;
   setMode: (mode: ConversationMode) => void;
-  setProcedureType: (procedureType: string) => void;
-  finishAttention: () => void;
-  startNewAttention: () => void;
-  reopenAttention: (recordId: string) => void;
+  setProcedureType: (procedureType: string) => Promise<void>;
+  finishAttention: () => Promise<void>;
+  startNewAttention: () => Promise<void>;
+  reopenAttention: (recordId: string) => Promise<void>;
 }
 
-const initialRecord = MOCK_HISTORY.find((record) => record.status === "active") ?? MOCK_HISTORY[0];
 let captureAttempt = 0;
-
-function formatTime(date = new Date()): string {
-  return new Intl.DateTimeFormat("es-BO", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(date);
-}
 
 function replaceRecord(
   records: HistoryRecord[],
@@ -63,34 +69,68 @@ function createMessage(
   sender: ConversationMessage["sender"],
   text: string,
   source: ConversationMessage["source"],
-): ConversationMessage {
+): Pick<ConversationMessage, "sender" | "text" | "source" | "state"> {
   return {
-    id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     sender,
     text,
-    time: formatTime(),
-    state: sender === "citizen" ? "confirmed" : "sent",
     source,
+    state: sender === "citizen" ? "confirmed" : "sent",
   };
 }
 
+function getRecord(state: AttentionState): HistoryRecord | undefined {
+  return state.records.find((record) => record.id === state.activeRecordId);
+}
+
 export const useAttentionStore = create<AttentionState>((set, get) => ({
-  records: MOCK_HISTORY,
-  activeRecordId: initialRecord.id,
-  procedureType: initialRecord.procedureType,
+  records: [],
+  activeRecordId: "",
+  procedureType: "Registro ciudadano",
   captureStatus: "idle",
   captureText: "",
   captureError: null,
   failNextRecognition: false,
   draft: "",
   draftError: null,
-  notes: initialRecord.notes,
+  notes: "",
   notesError: null,
+  notesDirty: false,
   mode: "capture",
-  messages: initialRecord.messages,
+  messages: [],
+  isReady: false,
+  isLoading: false,
+  isSaving: false,
+  syncError: null,
+
+  loadRecords: async () => {
+    if (get().isLoading) return;
+    set({ isLoading: true, syncError: null });
+    try {
+      const records = await listAttentionRecords();
+      const activeRecord = records.find((record) => record.status === "active") ?? records[0];
+      set({
+        records,
+        activeRecordId: activeRecord?.id ?? "",
+        procedureType: activeRecord?.procedureType ?? "Registro ciudadano",
+        notes: activeRecord?.notes ?? "",
+        notesDirty: false,
+        messages: activeRecord?.messages ?? [],
+        isReady: true,
+        isLoading: false,
+      });
+    } catch (error) {
+      set({
+        isReady: true,
+        isLoading: false,
+        syncError: error instanceof Error ? error.message : "No se pudieron cargar las atenciones.",
+      });
+    }
+  },
+
+  clearSyncError: () => set({ syncError: null }),
 
   startCapture: async () => {
-    const activeRecord = get().records.find((record) => record.id === get().activeRecordId);
+    const activeRecord = getRecord(get());
     if (activeRecord?.status !== "active") return;
     const attempt = ++captureAttempt;
     const shouldFail = get().failNextRecognition;
@@ -127,20 +167,29 @@ export const useAttentionStore = create<AttentionState>((set, get) => ({
     set({ captureStatus: "idle", captureText: "", captureError: null });
   },
 
-  confirmCapture: () => {
+  confirmCapture: async () => {
     const state = get();
-    if (state.captureStatus !== "reviewing" || !state.captureText.trim()) return;
-    const message = createMessage("citizen", state.captureText.trim(), "reviewed-sign");
-    const messages = [...state.messages, message];
-    set((current) => ({
-      messages,
-      captureStatus: "confirmed",
-      captureError: null,
-      records: replaceRecord(current.records, current.activeRecordId, (record) => ({
-        ...record,
+    const record = getRecord(state);
+    if (state.captureStatus !== "reviewing" || !state.captureText.trim() || !record || state.isSaving) return;
+    set({ isSaving: true, syncError: null });
+    try {
+      const message = await addAttentionMessage(
+        record.id,
+        createMessage("citizen", state.captureText.trim(), "reviewed-sign"),
+      );
+      const messages = [...get().messages, message];
+      set((current) => ({
         messages,
-      })),
-    }));
+        captureStatus: "confirmed",
+        captureError: null,
+        syncError: null,
+        records: replaceRecord(current.records, record.id, (currentRecord) => ({ ...currentRecord, messages })),
+      }));
+    } catch (error) {
+      set({ syncError: error instanceof Error ? error.message : "No se pudo guardar el mensaje.", captureError: "No se guardó el mensaje. Puedes volver a intentarlo." });
+    } finally {
+      set({ isSaving: false });
+    }
   },
 
   setCaptureText: (captureText) => set({ captureText }),
@@ -153,27 +202,38 @@ export const useAttentionStore = create<AttentionState>((set, get) => ({
   setFailNextRecognition: (enabled) => set({ failNextRecognition: enabled }),
   setDraft: (draft) => set({ draft, draftError: null }),
 
-  sendReply: (source = "typed") => {
+  sendReply: async (source = "typed") => {
     const state = get();
-    const activeRecord = state.records.find((record) => record.id === state.activeRecordId);
-    if (activeRecord?.status !== "active") return false;
+    const activeRecord = getRecord(state);
+    if (activeRecord?.status !== "active" || state.isSaving) return false;
     const result = replyTextSchema.safeParse(state.draft);
     if (!result.success) {
       set({ draftError: result.error.issues[0]?.message ?? "Revisa el texto antes de continuar." });
       return false;
     }
-    const messages = [...state.messages, createMessage("staff", result.data, source)];
-    set((current) => ({
-      messages,
-      draft: "",
-      draftError: null,
-      records: replaceRecord(current.records, current.activeRecordId, (record) => ({
-        ...record,
+
+    set({ isSaving: true, syncError: null });
+    try {
+      const message = await addAttentionMessage(
+        activeRecord.id,
+        createMessage("staff", result.data, source),
+      );
+      const messages = [...get().messages, message];
+      set((current) => ({
         messages,
-      })),
-      mode: "capture",
-    }));
-    return true;
+        draft: "",
+        draftError: null,
+        syncError: null,
+        records: replaceRecord(current.records, activeRecord.id, (record) => ({ ...record, messages })),
+        mode: "capture",
+      }));
+      return true;
+    } catch (error) {
+      set({ syncError: error instanceof Error ? error.message : "No se pudo guardar la respuesta." });
+      return false;
+    } finally {
+      set({ isSaving: false });
+    }
   },
 
   setNotes: (notes) => {
@@ -182,87 +242,132 @@ export const useAttentionStore = create<AttentionState>((set, get) => ({
       set({ notes, notesError: result.error.issues[0]?.message ?? "Revisa las observaciones." });
       return;
     }
+    const activeRecord = getRecord(get());
     set((state) => ({
       notes,
       notesError: null,
-      records: replaceRecord(state.records, state.activeRecordId, (record) => ({ ...record, notes })),
+      notesDirty: true,
+      records: activeRecord
+        ? replaceRecord(state.records, activeRecord.id, (record) => ({ ...record, notes }))
+        : state.records,
     }));
+  },
+
+  saveNotes: async () => {
+    const state = get();
+    const record = getRecord(state);
+    if (!record || !state.notesDirty || state.isSaving) return;
+    set({ isSaving: true, syncError: null });
+    try {
+      await updateAttentionRecord(record.id, { notes: state.notes });
+      set({ notesDirty: false, notesError: null, syncError: null });
+    } catch (error) {
+      set({ syncError: error instanceof Error ? error.message : "No se pudieron guardar las observaciones." });
+    } finally {
+      set({ isSaving: false });
+    }
   },
 
   setMode: (mode) => set({ mode }),
 
-  setProcedureType: (procedureType) => set((state) => ({
-    procedureType,
-    records: replaceRecord(state.records, state.activeRecordId, (record) => ({
-      ...record,
-      procedureType,
-    })),
-  })),
-
-  finishAttention: () => {
-    captureAttempt += 1;
-    set((state) => ({
-      records: replaceRecord(state.records, state.activeRecordId, (record) => ({
-        ...record,
-        status: "completed",
-        durationMinutes: Math.max(record.durationMinutes, 12),
-        notes: state.notes,
-      })),
-      captureStatus: "idle",
-      captureText: "",
-      captureError: null,
-    }));
-  },
-
-  startNewAttention: () => {
+  setProcedureType: async (procedureType) => {
     const state = get();
-    const nextNumber = state.records.reduce((max, record) => {
-      const match = record.id.match(/(\d+)$/);
-      return Math.max(max, match ? Number(match[1]) : 0);
-    }, 0) + 1;
-    const record: HistoryRecord = {
-      id: `AT-DEMO-${String(nextNumber).padStart(4, "0")}`,
-      procedureType: "Registro ciudadano",
-      startedAt: new Date(MOCK_HISTORY_ANCHOR.getTime() - 60_000).toISOString(),
-      status: "active",
-      durationMinutes: 0,
-      messages: [],
-      notes: "",
-    };
-    captureAttempt += 1;
+    const record = getRecord(state);
+    if (!record || record.status !== "active" || state.isSaving) return;
+    const previousType = state.procedureType;
+    set({ procedureType, isSaving: true, syncError: null });
     set((current) => ({
-      records: [record, ...current.records],
-      activeRecordId: record.id,
-      procedureType: record.procedureType,
-      captureStatus: "idle",
-      captureText: "",
-      captureError: null,
-      draft: "",
-      draftError: null,
-      notes: "",
-      notesError: null,
-      messages: [],
-      mode: "capture",
+      records: replaceRecord(current.records, record.id, (item) => ({ ...item, procedureType })),
     }));
+    try {
+      await updateAttentionRecord(record.id, { procedureType });
+    } catch (error) {
+      set((current) => ({
+        procedureType: current.activeRecordId === record.id ? previousType : current.procedureType,
+        records: replaceRecord(current.records, record.id, (item) => ({ ...item, procedureType: previousType })),
+        syncError: error instanceof Error ? error.message : "No se pudo guardar el tipo de trámite.",
+      }));
+    } finally {
+      set({ isSaving: false });
+    }
   },
 
-  reopenAttention: (recordId) => {
-    const record = get().records.find((item) => item.id === recordId);
-    if (!record || record.status === "cancelled") return;
+  finishAttention: async () => {
+    const state = get();
+    const record = getRecord(state);
+    if (!record || record.status !== "active" || state.isSaving) return;
     captureAttempt += 1;
-    set((state) => ({
-      records: replaceRecord(state.records, recordId, (item) => ({ ...item, status: "active" })),
-      activeRecordId: recordId,
-      procedureType: record.procedureType,
-      messages: record.messages,
-      notes: record.notes,
-      captureStatus: "idle",
-      captureText: "",
-      captureError: null,
-    }));
+    set({ isSaving: true, syncError: null });
+    try {
+      const { durationMinutes } = await finishAttentionRecord(record.id);
+      set((current) => ({
+        records: replaceRecord(current.records, record.id, (item) => ({ ...item, status: "completed", durationMinutes })),
+        captureStatus: "idle",
+        captureText: "",
+        captureError: null,
+        syncError: null,
+      }));
+    } catch (error) {
+      set({ syncError: error instanceof Error ? error.message : "No se pudo finalizar la atención." });
+    } finally {
+      set({ isSaving: false });
+    }
+  },
+
+  startNewAttention: async () => {
+    if (get().isSaving) return;
+    set({ isSaving: true, syncError: null });
+    try {
+      const record = await createAttentionRecord("Registro ciudadano");
+      captureAttempt += 1;
+      set((current) => ({
+        records: [record, ...current.records],
+        activeRecordId: record.id,
+        procedureType: record.procedureType,
+        captureStatus: "idle",
+        captureText: "",
+        captureError: null,
+        draft: "",
+        draftError: null,
+        notes: "",
+        notesError: null,
+        notesDirty: false,
+        messages: [],
+        mode: "capture",
+        syncError: null,
+      }));
+    } catch (error) {
+      set({ syncError: error instanceof Error ? error.message : "No se pudo iniciar una atención." });
+    } finally {
+      set({ isSaving: false });
+    }
+  },
+
+  reopenAttention: async (recordId) => {
+    const record = get().records.find((item) => item.id === recordId);
+    if (!record || record.status !== "completed" || get().isSaving) return;
+    set({ isSaving: true, syncError: null });
+    try {
+      await reopenAttentionRecord(recordId);
+      captureAttempt += 1;
+      set((state) => ({
+        records: replaceRecord(state.records, recordId, (item) => ({ ...item, status: "active" })),
+        activeRecordId: recordId,
+        procedureType: record.procedureType,
+        messages: record.messages,
+        notes: record.notes,
+        notesDirty: false,
+        captureStatus: "idle",
+        captureText: "",
+        captureError: null,
+        draft: "",
+        draftError: null,
+        syncError: null,
+      }));
+    } catch (error) {
+      set({ syncError: error instanceof Error ? error.message : "No se pudo reabrir la atención." });
+    } finally {
+      set({ isSaving: false });
+    }
   },
 }));
-
-export function getActiveRecord(records: HistoryRecord[], recordId: string): HistoryRecord {
-  return records.find((record) => record.id === recordId) ?? initialRecord;
-}

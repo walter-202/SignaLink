@@ -15,6 +15,9 @@ const PAGE_SIZE = 10;
 export function HistoryWorkspace() {
   const router = useRouter();
   const records = useAttentionStore((state) => state.records);
+  const isReady = useAttentionStore((state) => state.isReady);
+  const syncError = useAttentionStore((state) => state.syncError);
+  const loadRecords = useAttentionStore((state) => state.loadRecords);
   const reopenAttention = useAttentionStore((state) => state.reopenAttention);
   const [filters, setFilters] = useState<HistoryFiltersType>({
     query: "",
@@ -42,21 +45,32 @@ export function HistoryWorkspace() {
     setPage(1);
   }
 
-  function handleReopen(recordId: string) {
-    reopenAttention(recordId);
+  async function handleReopen(recordId: string) {
+    await reopenAttention(recordId);
+    if (useAttentionStore.getState().syncError) return;
     router.push("/atender");
+  }
+
+  if (!isReady) {
+    return <div className="workspace-loading" role="status"><span className="spinner" aria-hidden="true" /> Cargando historial guardado…</div>;
   }
 
   return (
     <div className="workspace-page history-page">
       <header className="page-heading">
         <div>
-          <p className="eyebrow">Consultas de la sesión de demostración</p>
+          <p className="eyebrow">Registros de tu cuenta de personal</p>
           <h1>Historial de trámites</h1>
           <p>Consulta y revisa las atenciones realizadas.</p>
         </div>
-        <span className="history-demo-note"><History size={15} aria-hidden="true" /> Datos ficticios · no persistentes</span>
+        <span className="history-demo-note"><History size={15} aria-hidden="true" /> Datos guardados en Supabase</span>
       </header>
+
+      {syncError ? (
+        <p className="sync-error" role="alert">
+          {syncError} <button type="button" onClick={() => void loadRecords()}>Volver a cargar</button>
+        </p>
+      ) : null}
 
       <HistoryFilters filters={filters} onChange={changeFilters} onClear={clearFilters} />
 

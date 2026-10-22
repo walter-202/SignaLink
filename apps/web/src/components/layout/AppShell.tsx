@@ -2,12 +2,13 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   CircleHelp,
   Clock3,
   Hand,
   History,
+  LogOut,
   Maximize,
   Menu,
   MapPin,
@@ -19,6 +20,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { useAttentionStore } from "@/features/attention/application/attention-store";
+import { createClient } from "@/lib/supabase/client";
 
 const navigation = [
   { href: "/atender", label: "Atención", icon: Hand },
@@ -27,12 +29,14 @@ const navigation = [
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [clock, setClock] = useState("");
   const [helpOpen, setHelpOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [highContrast, setHighContrast] = useState(false);
+  const [signOutError, setSignOutError] = useState("");
   const records = useAttentionStore((state) => state.records);
   const activeRecordId = useAttentionStore((state) => state.activeRecordId);
   const activeRecord = records.find((record) => record.id === activeRecordId);
@@ -57,6 +61,20 @@ export default function AppShell({ children }: { children: ReactNode }) {
       void document.exitFullscreen();
     } else {
       void document.documentElement.requestFullscreen?.();
+    }
+  }
+
+  async function handleSignOut() {
+    try {
+      const { error } = await createClient().auth.signOut();
+      if (error) {
+        setSignOutError("No se pudo cerrar la sesión. Intenta otra vez.");
+        return;
+      }
+      router.replace("/login");
+      router.refresh();
+    } catch {
+      setSignOutError("No se pudo cerrar la sesión. Intenta otra vez.");
     }
   }
 
@@ -98,6 +116,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
           </button>
           <button className="icon-button" type="button" onClick={() => setSettingsOpen(true)} aria-label="Configuración" title="Configuración">
             <Settings2 size={19} aria-hidden="true" />
+          </button>
+          <button className="icon-button" type="button" onClick={() => void handleSignOut()} aria-label="Cerrar sesión" title="Cerrar sesión">
+            <LogOut size={18} aria-hidden="true" />
           </button>
         </div>
       </header>
@@ -145,20 +166,23 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <button className="mobile-scrim" type="button" onClick={() => setMobileOpen(false)} aria-label="Cerrar menú" />
         ) : null}
 
-        <main className="workspace-main" id="main-content">{children}</main>
+        <main className="workspace-main" id="main-content">
+          {signOutError ? <p className="sync-error" role="alert">{signOutError}</p> : null}
+          {children}
+        </main>
       </div>
 
       <Dialog
         open={helpOpen}
         onOpenChange={setHelpOpen}
         title="Ayuda para esta demostración"
-        description="La interfaz usa datos ficticios y no está conectada a servicios de reconocimiento."
+        description="La interfaz guarda las atenciones y conversaciones de tu cuenta. El reconocimiento de señas todavía es demostrativo."
         footer={<Button variant="primary" onClick={() => setHelpOpen(false)}>Entendido</Button>}
       >
         <ul className="dialog-list">
           <li>Revisa y confirma cualquier interpretación antes de añadirla a la conversación.</li>
           <li>La vista previa del avatar es demostrativa y no valida señas en LSB.</li>
-          <li>Los datos permanecen en memoria durante esta sesión del navegador.</li>
+          <li>Los mensajes y observaciones se guardan en Supabase; la cámara no almacena sus imágenes ni audio.</li>
         </ul>
       </Dialog>
 

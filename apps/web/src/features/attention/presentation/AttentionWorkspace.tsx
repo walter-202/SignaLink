@@ -28,12 +28,18 @@ export function AttentionWorkspace() {
   const [toast, setToast] = useState("");
   const responseRef = useRef<HTMLTextAreaElement>(null);
   const records = useAttentionStore((state) => state.records);
+  const isReady = useAttentionStore((state) => state.isReady);
+  const isSaving = useAttentionStore((state) => state.isSaving);
+  const syncError = useAttentionStore((state) => state.syncError);
+  const loadRecords = useAttentionStore((state) => state.loadRecords);
   const activeRecordId = useAttentionStore((state) => state.activeRecordId);
   const procedureType = useAttentionStore((state) => state.procedureType);
   const setProcedureType = useAttentionStore((state) => state.setProcedureType);
   const notes = useAttentionStore((state) => state.notes);
   const notesError = useAttentionStore((state) => state.notesError);
+  const notesDirty = useAttentionStore((state) => state.notesDirty);
   const setNotes = useAttentionStore((state) => state.setNotes);
+  const saveNotes = useAttentionStore((state) => state.saveNotes);
   const setMode = useAttentionStore((state) => state.setMode);
   const finishAttention = useAttentionStore((state) => state.finishAttention);
   const startNewAttention = useAttentionStore((state) => state.startNewAttention);
@@ -63,17 +69,39 @@ export function AttentionWorkspace() {
     panel?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "nearest" });
   }
 
-  function confirmFinish() {
-    finishAttention();
+  async function confirmFinish() {
+    await finishAttention();
+    if (useAttentionStore.getState().syncError) return;
     setConfirmFinishOpen(false);
-    setToast("La atención de demostración se marcó como finalizada.");
+    setToast("La atención se guardó como finalizada.");
     window.setTimeout(() => setToast(""), 4_000);
   }
 
-  function handleNewAttention() {
-    startNewAttention();
-    setToast("Nueva atención de demostración iniciada.");
+  async function handleNewAttention() {
+    await startNewAttention();
+    if (useAttentionStore.getState().syncError) return;
+    setToast("Nueva atención iniciada y guardada.");
     window.setTimeout(() => setToast(""), 4_000);
+  }
+
+  if (!isReady) {
+    return <div className="workspace-loading" role="status"><span className="spinner" aria-hidden="true" /> Cargando atenciones guardadas…</div>;
+  }
+
+  if (records.length === 0) {
+    return (
+      <div className="workspace-page attention-empty-state">
+        <div className="panel-card">
+          <h1>Inicia una atención</h1>
+          <p>Las atenciones, observaciones y mensajes se guardarán en tu cuenta de personal.</p>
+          {syncError ? <p className="sync-error" role="alert">{syncError}</p> : null}
+          <Button variant="primary" onClick={() => void handleNewAttention()} disabled={isSaving}>
+            {isSaving ? "Iniciando…" : "Iniciar atención"}
+          </Button>
+          {syncError ? <Button variant="secondary" onClick={() => void loadRecords()}>Reintentar carga</Button> : null}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -101,14 +129,18 @@ export function AttentionWorkspace() {
             <span className="finished-session-label"><Check size={15} aria-hidden="true" /> Atención finalizada</span>
           )}
           {sessionActive ? (
-            <Button variant="danger" onClick={() => setConfirmFinishOpen(true)}>
+            <Button variant="danger" onClick={() => setConfirmFinishOpen(true)} disabled={isSaving}>
               Finalizar atención <Square size={14} aria-hidden="true" />
             </Button>
           ) : (
-            <Button variant="primary" onClick={handleNewAttention}>Iniciar nueva atención</Button>
+            <Button variant="primary" onClick={() => void handleNewAttention()} disabled={isSaving}>
+              {isSaving ? "Guardando…" : "Iniciar nueva atención"}
+            </Button>
           )}
         </div>
       </header>
+
+      {syncError ? <p className="sync-error" role="alert">{syncError}</p> : null}
 
       <div className="attention-grid">
         <div className="attention-column attention-column--capture">
@@ -133,7 +165,7 @@ export function AttentionWorkspace() {
             </dl>
           </section>
           <section className="panel-card notes-card" aria-labelledby="notes-title">
-            <header className="compact-card-heading"><h2 id="notes-title">Observaciones</h2><span className="notes-local-badge">Solo en sesión</span></header>
+            <header className="compact-card-heading"><h2 id="notes-title">Observaciones</h2><span className="notes-local-badge">{notesDirty ? "Pendiente de guardar" : "Guardado"}</span></header>
             <label className="sr-only" htmlFor="procedure-notes">Observaciones internas</label>
             <textarea
               id="procedure-notes"
@@ -142,26 +174,27 @@ export function AttentionWorkspace() {
               disabled={!sessionActive}
               placeholder="Agrega una nota interna sobre esta atención…"
               onChange={(event) => setNotes(event.currentTarget.value)}
+              onBlur={() => void saveNotes()}
               aria-describedby={notesError ? "notes-error" : "notes-counter"}
             />
             <div className="composer-count-row">
-              {notesError ? <span className="field-error" id="notes-error" role="alert">{notesError}</span> : <span className="help-text">No se guarda fuera de esta sesión.</span>}
+              {notesError ? <span className="field-error" id="notes-error" role="alert">{notesError}</span> : <span className="help-text">Se guarda al salir del campo.</span>}
               <span className="character-count" id="notes-counter">{notes.length} / 300</span>
             </div>
           </section>
         </aside>
       </div>
 
-      <p className="prototype-note"><strong>Demostración:</strong> el reconocimiento usa una respuesta fija; la vista del avatar no corresponde a una traducción LSB validada.</p>
+      <p className="prototype-note"><strong>Revisión humana:</strong> la propuesta de señas todavía es demostrativa; confirma o corrige el texto antes de guardarlo. La cámara y sus imágenes no se almacenan.</p>
       <div className="sr-only" role="status" aria-live="polite">{toast}</div>
 
       <Dialog
         open={procedureInfoOpen}
         onOpenChange={setProcedureInfoOpen}
         title="Datos del trámite"
-        description="El tipo se elige manualmente para organizar esta atención de demostración."
+        description="El tipo se elige manualmente y se guarda con la atención."
       >
-        <p>Los datos del trámite y las observaciones no se envían a una institución ni se guardan fuera de la sesión actual.</p>
+        <p>Los mensajes y observaciones se guardan en esta cuenta de personal. La aplicación solo persiste texto; no sube imágenes, video ni audio de la cámara.</p>
       </Dialog>
 
       <Dialog
@@ -172,7 +205,7 @@ export function AttentionWorkspace() {
         footer={(
           <>
             <Button variant="secondary" onClick={() => setConfirmFinishOpen(false)}>Seguir atendiendo</Button>
-            <Button variant="danger" onClick={confirmFinish}>Sí, finalizar</Button>
+            <Button variant="danger" onClick={() => void confirmFinish()} disabled={isSaving}>Sí, finalizar</Button>
           </>
         )}
       >

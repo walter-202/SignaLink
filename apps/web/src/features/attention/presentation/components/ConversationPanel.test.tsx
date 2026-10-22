@@ -1,6 +1,19 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/features/attention/infrastructure/attention-repository", () => ({
+  addAttentionMessage: vi.fn(async (_reference: string, message: { sender: string; text: string; source: string; state: string }) => ({
+    ...message,
+    id: `saved-${Date.now()}`,
+    time: "10:25",
+  })),
+  createAttentionRecord: vi.fn(),
+  finishAttentionRecord: vi.fn(),
+  listAttentionRecords: vi.fn(),
+  reopenAttentionRecord: vi.fn(),
+  updateAttentionRecord: vi.fn(),
+}));
 import { useAttentionStore } from "@/features/attention/application/attention-store";
 import { MOCK_HISTORY } from "@/features/procedure-history/mocks/history.mock";
 import { ConversationPanel } from "./ConversationPanel";
@@ -18,8 +31,13 @@ function resetStore() {
     draftError: null,
     notes: "",
     notesError: null,
+    notesDirty: false,
     mode: "capture",
     messages: MOCK_HISTORY[0]!.messages,
+    isReady: true,
+    isLoading: false,
+    isSaving: false,
+    syncError: null,
   });
 }
 

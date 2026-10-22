@@ -4,7 +4,7 @@
 
 > Proyecto universitario de ingeniería de software, accesibilidad e inteligencia artificial para facilitar la comunicación bidireccional durante trámites presenciales.
 
-**Estado:** Prototipo de interfaz funcional con flujos de atención e historial. Usa datos simulados en memoria; ya conecta la cámara y detecta landmarks localmente con MediaPipe, pero todavía no hay clasificador LSB, persistencia ni servicios institucionales. El avatar es ilustrativo y no traduce señas.
+**Estado:** MVP en integración: ya permite iniciar sesión con Supabase Auth y guardar atenciones, conversaciones y observaciones en PostgreSQL con RLS por cuenta. La cámara detecta landmarks localmente con MediaPipe, pero la interpretación sigue simulada; todavía no hay clasificador LSB ni servicios institucionales. El avatar es ilustrativo y no traduce señas.
 
 **Nombre anterior:** SignaLink.
 
@@ -12,7 +12,7 @@
 
 **Arquitectura prevista:** PWA modular, reconocimiento mediante modelos intercambiables e inferencia local cuando sea viable.
 
-La implementación actual está en [`apps/web`](apps/web/README.md). Incluye las vistas `/atender` y `/historial`, cámara con landmarks locales opcionales, revisión manual de capturas simuladas, respuestas de ejemplo y filtros sobre registros ficticios.
+La implementación actual está en [`apps/web`](apps/web/README.md). Incluye `/login`, `/atender` y `/historial`, cámara con landmarks locales opcionales, revisión manual de propuestas simuladas, respuestas y filtros sobre registros persistidos. Las cuentas se crean desde Supabase Auth; cada cuenta solo puede acceder a sus propios registros.
 
 ---
 
@@ -111,11 +111,11 @@ No se crearán abstracciones innecesarias cuando una función o componente simpl
 | Componentes | Tailwind CSS, shadcn/ui, Radix |
 | Estado | Zustand |
 | Validaciones | Zod |
-| Datos remotos | TanStack Query cuando corresponda |
-| Persistencia local | IndexedDB, Dexie |
+| Datos remotos | Supabase JS con Row Level Security |
+| Persistencia local | Zustand para estado de interfaz |
 | Backend gestionado | Supabase |
 | Base de datos | PostgreSQL |
-| Autenticación administrativa | Supabase Auth |
+| Autenticación de personal | Supabase Auth |
 | Multimedia | Supabase Storage |
 | Captura y landmarks | MediaPipe Tasks Vision |
 | Inferencia | ONNX Runtime Web |

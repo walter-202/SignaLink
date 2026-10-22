@@ -116,7 +116,7 @@ export function HistoryTable({
           </footer>
         </>
       )}
-      {records.length > 0 ? <p className="list-hint"><FileClock size={13} aria-hidden="true" /> Registros ficticios de demostración; no representan personas reales.</p> : null}
+      {records.length > 0 ? <p className="list-hint"><FileClock size={13} aria-hidden="true" /> Cada atención solo es visible desde la cuenta que la registró.</p> : null}
     </section>
   );
 }

@@ -90,7 +90,7 @@ export function HistoryDetailPanel({ record, onReopen }: HistoryDetailPanelProps
         open={conversationOpen}
         onOpenChange={setConversationOpen}
         title={`Conversación · ${record.id}`}
-        description="Resumen de mensajes de esta atención de demostración."
+        description="Mensajes guardados durante esta atención."
         className="conversation-dialog"
       >
         <ol className="dialog-conversation-list">
@@ -108,11 +108,11 @@ export function HistoryDetailPanel({ record, onReopen }: HistoryDetailPanelProps
         open={reopenConfirmOpen}
         onOpenChange={setReopenConfirmOpen}
         title="¿Reabrir esta atención?"
-        description="La acción solo cambia el estado de los datos de demostración en esta sesión."
+        description="La atención reabierta quedará guardada como activa."
         footer={(
           <>
             <Button variant="secondary" onClick={() => setReopenConfirmOpen(false)}>Cancelar</Button>
-            <Button variant="primary" onClick={() => { onReopen(record.id); setReopenConfirmOpen(false); }}>
+            <Button variant="primary" onClick={() => { void onReopen(record.id); setReopenConfirmOpen(false); }}>
               <ShieldCheck size={15} aria-hidden="true" /> Reabrir atención
             </Button>
           </>

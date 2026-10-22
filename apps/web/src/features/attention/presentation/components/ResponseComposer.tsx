@@ -22,6 +22,7 @@ export function ResponseComposer({ textareaRef }: ResponseComposerProps) {
   const draftError = useAttentionStore((state) => state.draftError);
   const setDraft = useAttentionStore((state) => state.setDraft);
   const sendReply = useAttentionStore((state) => state.sendReply);
+  const isSaving = useAttentionStore((state) => state.isSaving);
   const records = useAttentionStore((state) => state.records);
   const activeRecordId = useAttentionStore((state) => state.activeRecordId);
   const [source, setSource] = useState<"typed" | "frequent-phrase" | "dictation">("typed");
@@ -32,8 +33,8 @@ export function ResponseComposer({ textareaRef }: ResponseComposerProps) {
   const dictationBaseRef = useRef("");
   const sessionActive = records.find((record) => record.id === activeRecordId)?.status === "active";
 
-  function handleSend() {
-    if (sendReply(source)) setSource("typed");
+  async function handleSend() {
+    if (await sendReply(source)) setSource("typed");
   }
 
   function startDictation() {
@@ -76,7 +77,7 @@ export function ResponseComposer({ textareaRef }: ResponseComposerProps) {
         onKeyDown={(event) => {
           if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
             event.preventDefault();
-            handleSend();
+            void handleSend();
           }
         }}
       />
@@ -109,7 +110,7 @@ export function ResponseComposer({ textareaRef }: ResponseComposerProps) {
           size="small"
           variant="primary"
           onClick={handleSend}
-          disabled={!sessionActive || dictationActive || !draft.trim()}
+          disabled={!sessionActive || dictationActive || isSaving || !draft.trim()}
           aria-label="Enviar respuesta"
           title="Enviar respuesta"
         >

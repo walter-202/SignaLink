@@ -28,6 +28,7 @@ export function ConversationPanel({ onRespond, onUseSigns }: ConversationPanelPr
   const captureText = useAttentionStore((state) => state.captureText);
   const captureError = useAttentionStore((state) => state.captureError);
   const confirmCapture = useAttentionStore((state) => state.confirmCapture);
+  const isSaving = useAttentionStore((state) => state.isSaving);
   const setCaptureText = useAttentionStore((state) => state.setCaptureText);
   const cancelCapture = useAttentionStore((state) => state.cancelCapture);
   const retryCapture = useAttentionStore((state) => state.retryCapture);
@@ -111,7 +112,7 @@ export function ConversationPanel({ onRespond, onUseSigns }: ConversationPanelPr
           <div className="review-actions">
             <Button variant="secondary" size="small" onClick={cancelCapture}><X size={14} aria-hidden="true" /> Descartar</Button>
             <Button variant="secondary" size="small" onClick={() => void retryCapture()}><RotateCcw size={14} aria-hidden="true" /> Reintentar</Button>
-            <Button variant="primary" size="small" onClick={confirmCapture}><ShieldCheck size={14} aria-hidden="true" /> Confirmar mensaje</Button>
+            <Button variant="primary" size="small" onClick={() => void confirmCapture()} disabled={isSaving}><ShieldCheck size={14} aria-hidden="true" /> {isSaving ? "Guardando…" : "Confirmar mensaje"}</Button>
           </div>
         </div>
       ) : null}
