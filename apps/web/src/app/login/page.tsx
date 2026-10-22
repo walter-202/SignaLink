@@ -7,7 +7,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 export const dynamic = "force-dynamic";
 
 interface LoginPageProps {
-  searchParams: Promise<{ setup?: string; redirectTo?: string }>;
+  searchParams: Promise<{ setup?: string; redirectTo?: string; access?: string }>;
 }
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
@@ -17,7 +17,15 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   if (configured) {
     const supabase = await createClient();
     const { data } = await supabase.auth.getClaims();
-    if (data?.claims?.sub) redirect("/atender");
+    if (data?.claims?.sub) {
+      const { data: staffAccess } = await supabase
+        .from("staff_access")
+        .select("user_id")
+        .eq("user_id", data.claims.sub)
+        .eq("is_active", true)
+        .maybeSingle();
+      if (staffAccess) redirect("/atender");
+    }
   }
 
   return (
@@ -33,7 +41,14 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             Configura <code>NEXT_PUBLIC_SUPABASE_URL</code> y <code>NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY</code> en <code>apps/web/.env.local</code>.
           </div>
         ) : (
-          <LoginForm redirectTo={params.redirectTo} />
+          <>
+            {params.access === "pending" ? (
+              <p className="auth-message auth-message--error" role="alert">
+                La cuenta inició sesión, pero aún no está autorizada para usar el sistema. Solicita al administrador que habilite tu acceso.
+              </p>
+            ) : null}
+            <LoginForm redirectTo={params.redirectTo} accessPending={params.access === "pending"} />
+          </>
         )}
 
         <p className="login-footnote">Las cuentas de personal se habilitan desde Supabase Auth; no hay registro público en esta aplicación.</p>

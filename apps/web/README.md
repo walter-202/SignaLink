@@ -59,9 +59,20 @@ La interfaz usa Next.js, TypeScript, Tailwind CSS 4, configuración compatible c
 
 El inicio de sesión y la sesión SSR usan `@supabase/ssr`, cookies y `getClaims()` para verificar al personal en páginas protegidas. `src/proxy.ts` renueva la sesión y protege `/atender` y `/historial`; el layout vuelve a verificar la identidad. El cliente del navegador solo usa la URL y publishable key. Nunca se incluye una clave `service_role` o `sb_secret` en el frontend.
 
-El esquema inicial está en `supabase/migrations/`. Se aplicó al proyecto `la-voz-de-tus-manos` en `sa-east-1`. `attentions` y `attention_messages` tienen RLS habilitado; cada usuario autenticado solo ve sus propios registros. Los mensajes no se pueden modificar desde la app y no se permite leer ni escribir como usuario anónimo. Las tablas solo guardan texto y referencias de trámites.
+El esquema inicial está en `supabase/migrations/`. Se aplicó al proyecto `la-voz-de-tus-manos` en `sa-east-1`. `attentions`, `attention_messages` y `staff_access` tienen RLS habilitado. Solo las cuentas incluidas en `staff_access` pueden entrar; cada miembro autorizado ve sus propios registros. Los mensajes no se pueden modificar desde la app y no se permite leer ni escribir como usuario anónimo. Las tablas solo guardan texto y referencias de trámites.
 
-Para ejecutar localmente, copia `apps/web/.env.example` a `apps/web/.env.local` y configura `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` con los valores del diálogo **Connect**; luego reinicia `pnpm dev:web`. El archivo local actual apunta al proyecto enlazado y está excluido por Git. Las cuentas se crean o invitan desde **Supabase Dashboard → Authentication → Users**; después el personal inicia sesión en `/login`. No compartas claves secretas para que otra persona pueda ejecutar la app.
+Para ejecutar localmente, copia `apps/web/.env.example` a `apps/web/.env.local` y configura `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` con los valores del diálogo **Connect**; luego reinicia `pnpm dev:web`. El archivo local actual apunta al proyecto enlazado y está excluido por Git. Crea o invita cada cuenta desde **Supabase Dashboard → Authentication → Users** y habilítala desde el SQL Editor; la tabla de autorización no admite cambios desde la app:
+
+```sql
+insert into public.staff_access (user_id, display_name)
+select id, 'Nombre del personal'
+from auth.users
+where email = 'persona@institucion.bo'
+on conflict (user_id) do update
+set display_name = excluded.display_name, is_active = true;
+```
+
+Luego el personal inicia sesión en `/login`. No compartas claves secretas para que otra persona pueda ejecutar la app.
 
 La política de RLS actual separa la información por cuenta de personal. Para compartir atenciones entre varias cuentas de una misma institución se añadirá un modelo explícito de organización y membresías antes de abrir ese acceso; no se usa una política amplia para todos los usuarios autenticados.
 

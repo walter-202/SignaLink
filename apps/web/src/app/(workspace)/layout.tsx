@@ -15,6 +15,13 @@ export default async function WorkspaceLayout({ children }: { children: ReactNod
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getClaims();
   if (error || !data?.claims?.sub) redirect("/login");
+  const { data: staffAccess, error: staffAccessError } = await supabase
+    .from("staff_access")
+    .select("user_id")
+    .eq("user_id", data.claims.sub)
+    .eq("is_active", true)
+    .maybeSingle();
+  if (staffAccessError || !staffAccess) redirect("/login?access=pending");
 
   return (
     <SpeechRecognitionProvider>

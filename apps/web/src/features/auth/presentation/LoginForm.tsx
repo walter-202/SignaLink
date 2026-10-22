@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 
 interface LoginFormProps {
   redirectTo?: string;
+  accessPending?: boolean;
 }
 
 function safeRedirectPath(value: string | undefined): string {
@@ -15,7 +16,7 @@ function safeRedirectPath(value: string | undefined): string {
   return "/atender";
 }
 
-export function LoginForm({ redirectTo }: LoginFormProps) {
+export function LoginForm({ redirectTo, accessPending = false }: LoginFormProps) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -48,6 +49,22 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
     }
   }
 
+  async function handleSignOut() {
+    try {
+      const { error: signOutError } = await createClient().auth.signOut();
+      if (signOutError) {
+        setError("No se pudo cerrar la sesión.");
+        return;
+      }
+      setEmail("");
+      setPassword("");
+      setError("");
+      router.refresh();
+    } catch {
+      setError("No se pudo cerrar la sesión.");
+    }
+  }
+
   return (
     <form className="login-form" onSubmit={handleSubmit}>
       <label htmlFor="staff-email">Correo electrónico</label>
@@ -71,6 +88,7 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
         required
       />
       {error ? <p className="auth-message auth-message--error" role="alert">{error}</p> : null}
+      {accessPending ? <button className="login-signout" type="button" onClick={() => void handleSignOut()}>Cerrar sesión para usar otra cuenta</button> : null}
       <button className="login-submit" type="submit" disabled={isSubmitting}>
         <LogIn size={17} aria-hidden="true" />
         {isSubmitting ? "Ingresando…" : "Iniciar sesión"}
