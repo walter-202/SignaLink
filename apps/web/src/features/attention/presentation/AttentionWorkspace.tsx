@@ -201,7 +201,7 @@ export function AttentionWorkspace() {
         open={confirmFinishOpen}
         onOpenChange={setConfirmFinishOpen}
         title="¿Finalizar esta atención?"
-        description="La atención se marcará como finalizada en los datos de demostración de esta sesión."
+        description="La atención se marcará como finalizada y quedará guardada en tu historial."
         footer={(
           <>
             <Button variant="secondary" onClick={() => setConfirmFinishOpen(false)}>Seguir atendiendo</Button>

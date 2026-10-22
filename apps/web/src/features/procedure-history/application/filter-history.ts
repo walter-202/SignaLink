@@ -1,5 +1,4 @@
 import type { HistoryRecord, ProcedureStatus } from "../domain/types";
-import { MOCK_HISTORY_ANCHOR } from "../mocks/history.mock";
 
 export type HistoryDateRange = "today" | "7days" | "30days" | "all";
 
@@ -15,7 +14,7 @@ const startOfLocalDay = (date: Date) =>
 export function filterHistory(
   records: HistoryRecord[],
   filters: HistoryFilters,
-  anchor: Date = MOCK_HISTORY_ANCHOR,
+  anchor: Date = new Date(),
 ): HistoryRecord[] {
   const query = filters.query.trim().toLocaleLowerCase("es-BO");
   const cutoff = new Date(anchor);
@@ -53,7 +52,7 @@ export function formatProcedureDate(value: string): string {
   }).format(new Date(value));
 }
 
-export function formatProcedureDateTime(value: string): string {
+export function formatProcedureDateTime(value: string, anchor: Date = new Date()): string {
   const date = new Date(value);
   const dateLabel = formatProcedureDate(value);
   const timeLabel = new Intl.DateTimeFormat("es-BO", {
@@ -61,7 +60,7 @@ export function formatProcedureDateTime(value: string): string {
     minute: "2-digit",
     hour12: false,
   }).format(date);
-  const anchorDay = startOfLocalDay(MOCK_HISTORY_ANCHOR);
+  const anchorDay = startOfLocalDay(anchor);
   const recordDay = startOfLocalDay(date);
   if (recordDay === anchorDay) return `Hoy, ${timeLabel}`;
   if (recordDay === anchorDay - 86_400_000) return `Ayer, ${timeLabel}`;

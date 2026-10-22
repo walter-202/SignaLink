@@ -162,9 +162,9 @@ export function ConversationPanel({ onRespond, onUseSigns }: ConversationPanelPr
         open={conversationInfoOpen}
         onOpenChange={setConversationInfoOpen}
         title="Revisión de la conversación"
-        description="Los mensajes se quedan en esta sesión de demostración."
+        description="Los mensajes se guardan en Supabase asociados a la cuenta del personal."
       >
-        <p>Las interpretaciones simuladas solo se añaden después de que el personal las revisa y confirma. No constituyen una traducción LSB validada.</p>
+        <p>Las propuestas de interpretación LSB todavía son simuladas; solo se guardan después de que el personal las revisa y confirma. No constituyen una traducción validada.</p>
       </Dialog>
     </section>
   );

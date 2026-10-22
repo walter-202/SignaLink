@@ -8,7 +8,7 @@ describe("filterHistory", () => {
       query: "",
       status: "all",
       dateRange: "30days",
-    });
+    }, MOCK_HISTORY_ANCHOR);
 
     expect(results).toHaveLength(18);
     expect(results[0]?.id).toBe("AT-2024-0018");
