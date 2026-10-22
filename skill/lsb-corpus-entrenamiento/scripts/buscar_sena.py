@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-"""Búsqueda y consulta rápida del vocabulario oficial LSB para pipelines de ML/NLP.
+"""Búsqueda de un vocabulario local LSB con licencia y calidad revisadas.
 
 Uso:
-    python buscar_sena.py "hola"
-    python buscar_sena.py --modulo M1 --categoria Saludos
-    python buscar_sena.py --multifase
+    python buscar_sena.py --vocab /ruta/local/vocabulario_lsb.json "hola"
+    python buscar_sena.py --vocab /ruta/local/vocabulario_lsb.json --modulo M1 --categoria Saludos
+    python buscar_sena.py --vocab /ruta/local/vocabulario_lsb.json --multifase
 """
 import argparse, json, os, re, sys, unicodedata
 
@@ -25,15 +25,16 @@ def cargar_vocabulario(path=None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Consulta del vocabulario oficial LSB.")
+    parser = argparse.ArgumentParser(description="Consulta un vocabulario local LSB revisado.")
     parser.add_argument("termino", nargs="?", default="", help="Palabra en español o glosa a buscar.")
+    parser.add_argument("--vocab", required=True, help="Ruta a un vocabulario local con permisos y calidad revisados.")
     parser.add_argument("--modulo", choices=["M1", "M2", "M3", "M4"], help="Filtrar por módulo (M1-M4).")
     parser.add_argument("--categoria", help="Filtrar por categoría / tema.")
     parser.add_argument("--multifase", action="store_true", help="Filtrar solo señas de múltiples fotogramas (a, b, c...).")
     parser.add_argument("--json", action="store_true", help="Salida en formato JSON crudo.")
     args = parser.parse_args()
 
-    data = cargar_vocabulario()
+    data = cargar_vocabulario(args.vocab)
     senas = data.get("senas", [])
 
     term = normalizar(args.termino) if args.termino else ""

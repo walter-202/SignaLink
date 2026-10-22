@@ -1,5 +1,7 @@
 # Parámetros Formacionales, Simbología y Notación de Movimiento de la LSB
 
+> Estado: notas provisionales heredadas de la rama Apaza. Verifica cada término y símbolo con módulo y página y pide revisión lingüística antes de usarlo como etiqueta, regla del modelo o material didáctico.
+
 Este documento sintetiza de forma técnica la fonología gestual y la notación de movimiento de la Lengua de Señas Boliviana (LSB), según los 4 Módulos de Enseñanza del Ministerio de Educación de Bolivia (Decreto Supremo Nº 0328).
 
 ---

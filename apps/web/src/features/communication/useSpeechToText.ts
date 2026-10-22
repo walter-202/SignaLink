@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type {
   SpeechRecognitionErrorEvent,
   SpeechRecognitionEvent,
@@ -8,176 +8,186 @@ import type {
   SpeechRecognitionStatus,
   UseSpeechToTextOptions,
   UseSpeechToTextReturn,
-} from './speech-recognition.types';
+} from "./speech-recognition.types";
 
-/**
- * Hook para reconocimiento de voz en tiempo real usando Web Speech API nativa.
- * Diseñado para la entrada de audio del funcionario en "La Voz de tus Manos".
- */
-export function useSpeechToText(options: UseSpeechToTextOptions = {}): UseSpeechToTextReturn {
+const subscribeToSupport = () => () => {};
+const getSupportSnapshot = () =>
+  typeof window !== "undefined" &&
+  Boolean(window.SpeechRecognition ?? window.webkitSpeechRecognition);
+const getServerSupportSnapshot = () => false;
+
+export function useSpeechToText(
+  options: UseSpeechToTextOptions = {},
+): UseSpeechToTextReturn {
   const {
-    lang = 'es-BO',
+    lang = "es-BO",
     continuous = true,
     interimResults = true,
     onFinalResult,
     onError,
   } = options;
-
-  const [transcript, setTranscript] = useState<string>('');
-  const [interimTranscript, setInterimTranscript] = useState<string>('');
-  const [status, setStatus] = useState<SpeechRecognitionStatus>('idle');
-  const [isSupported, setIsSupported] = useState<boolean>(false);
+  const [transcript, setTranscript] = useState("");
+  const [interimTranscript, setInterimTranscript] = useState("");
+  const [status, setStatus] = useState<SpeechRecognitionStatus>("idle");
+  const isSupported = useSyncExternalStore(
+    subscribeToSupport,
+    getSupportSnapshot,
+    getServerSupportSnapshot,
+  );
   const [error, setError] = useState<string | null>(null);
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
-  const shouldKeepListeningRef = useRef<boolean>(false);
+  const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const transcriptRef = useRef("");
+  const shouldKeepListeningRef = useRef(false);
+  const callbacksRef = useRef({ onFinalResult, onError });
 
-  // Comprobar soporte del navegador en montaje
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const SpeechRecognitionImpl =
-        window.SpeechRecognition || window.webkitSpeechRecognition;
-      setIsSupported(Boolean(SpeechRecognitionImpl));
-    }
-  }, []);
+    callbacksRef.current = { onFinalResult, onError };
+  }, [onFinalResult, onError]);
 
-  // Inicializar y configurar la instancia de reconocimiento
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
 
-    const SpeechRecognitionImpl =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
+    const Recognition = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+    if (!Recognition) return;
 
-    if (!SpeechRecognitionImpl) return;
+    const recognition = new Recognition();
+    recognition.continuous = continuous;
+    recognition.interimResults = interimResults;
+    recognition.lang = lang;
+    recognition.maxAlternatives = 1;
 
-    const instance: SpeechRecognitionInstance = new SpeechRecognitionImpl();
-    instance.continuous = continuous;
-    instance.interimResults = interimResults;
-    instance.lang = lang;
-    instance.maxAlternatives = 1;
-
-    instance.onstart = () => {
-      setStatus('listening');
+    recognition.onstart = () => {
+      setStatus("listening");
       setError(null);
     };
 
-    instance.onresult = (event: SpeechRecognitionEvent) => {
-      let currentInterim = '';
-      let accumulatedFinal = '';
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let finalChunk = "";
+      let currentInterim = "";
 
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        const text = result[0]?.transcript || '';
-
-        if (result.isFinal) {
-          accumulatedFinal += text;
-        } else {
-          currentInterim += text;
-        }
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        const result = event.results[index];
+        const text = result[0]?.transcript ?? "";
+        if (result.isFinal) finalChunk += text;
+        else currentInterim += text;
       }
 
-      if (accumulatedFinal) {
-        setTranscript((prev) => {
-          const next = prev ? `${prev} ${accumulatedFinal.trim()}` : accumulatedFinal.trim();
-          onFinalResult?.(next);
-          return next;
-        });
+      if (finalChunk.trim()) {
+        const nextTranscript = [transcriptRef.current, finalChunk.trim()]
+          .filter(Boolean)
+          .join(" ");
+        transcriptRef.current = nextTranscript;
+        setTranscript(nextTranscript);
+        callbacksRef.current.onFinalResult?.(nextTranscript);
       }
 
       setInterimTranscript(currentInterim.trim());
     };
 
-    instance.onerror = (event: SpeechRecognitionErrorEvent) => {
-      // Ignorar 'no-speech' habitual cuando hay pausas naturales de silencio
-      if (event.error === 'no-speech') {
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      if (event.error === "no-speech" || event.error === "aborted") return;
+
+      shouldKeepListeningRef.current = false;
+      setStatus("error");
+      const message = event.error === "not-allowed" || event.error === "service-not-allowed"
+        ? "El navegador no permitió usar el micrófono. Revisa los permisos del sitio."
+        : `Error de reconocimiento: ${event.error}`;
+      setError(message);
+      callbacksRef.current.onError?.(event);
+    };
+
+    recognition.onend = () => {
+      if (continuous && shouldKeepListeningRef.current) {
+        // Algunos navegadores cierran la sesión tras una pausa; reiniciarla
+        // con un pequeño retraso evita llamar start() durante el cierre.
+        if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+        restartTimerRef.current = setTimeout(() => {
+          restartTimerRef.current = null;
+          if (!shouldKeepListeningRef.current) return;
+          try {
+            recognition.start();
+          } catch {
+            shouldKeepListeningRef.current = false;
+            setStatus("idle");
+          }
+        }, 200);
         return;
       }
 
-      setStatus('error');
-      const errorMsg = `Error de reconocimiento: ${event.error}`;
-      setError(errorMsg);
-      onError?.(event);
+      setStatus("idle");
+      setInterimTranscript("");
     };
 
-    instance.onend = () => {
-      // Si el modo continuous fue pedido y el usuario no dio stop explícito,
-      // reiniciamos automáticamente (algunos navegadores cortan tras breves silencios).
-      if (shouldKeepListeningRef.current) {
-        try {
-          instance.start();
-          setStatus('listening');
-        } catch {
-          setStatus('idle');
-          shouldKeepListeningRef.current = false;
-        }
-      } else {
-        setStatus('idle');
-        setInterimTranscript('');
-      }
-    };
-
-    recognitionRef.current = instance;
-
+    recognitionRef.current = recognition;
     return () => {
       shouldKeepListeningRef.current = false;
+      if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
       try {
-        instance.abort();
+        recognition.abort();
       } catch {
-        // noop en limpieza
+        // Puede no haber una sesión activa al desmontar.
       }
       recognitionRef.current = null;
     };
-  }, [lang, continuous, interimResults, onFinalResult, onError]);
+  }, [continuous, interimResults, lang]);
 
   const startListening = useCallback(() => {
-    if (!recognitionRef.current) {
-      setError('Web Speech API no está soportada o no está inicializada.');
+    const recognition = recognitionRef.current;
+    if (!recognition) {
+      setError("El reconocimiento de voz no está disponible en este navegador.");
       return;
     }
 
     try {
+      if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
       shouldKeepListeningRef.current = true;
       setError(null);
-      recognitionRef.current.start();
-      setStatus('listening');
-    } catch (err: unknown) {
-      // Si ya estaba en ejecución, no genera fallo crítico
-      if (err instanceof DOMException && err.name === 'InvalidStateError') {
-        setStatus('listening');
-      } else {
-        setError('No se pudo acceder al micrófono o iniciar la captura.');
-        setStatus('error');
+      recognition.start();
+    } catch (cause) {
+      if (cause instanceof DOMException && cause.name === "InvalidStateError") {
+        setStatus("listening");
+        return;
       }
+      shouldKeepListeningRef.current = false;
+      setStatus("error");
+      setError("No se pudo iniciar la captura. Revisa los permisos del micrófono.");
     }
   }, []);
 
   const stopListening = useCallback(() => {
     shouldKeepListeningRef.current = false;
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-        setStatus('idle');
-      } catch {
-        // noop
-      }
+    if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+    restartTimerRef.current = null;
+    if (!recognitionRef.current) return;
+    setStatus("processing");
+    try {
+      recognitionRef.current.stop();
+    } catch {
+      setStatus("idle");
     }
   }, []);
 
   const abortListening = useCallback(() => {
     shouldKeepListeningRef.current = false;
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.abort();
-        setStatus('idle');
-      } catch {
-        // noop
-      }
+    if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+    restartTimerRef.current = null;
+    try {
+      recognitionRef.current?.abort();
+    } catch {
+      // No había una sesión activa.
     }
+    setStatus("idle");
+    setInterimTranscript("");
   }, []);
 
   const resetTranscript = useCallback(() => {
-    setTranscript('');
-    setInterimTranscript('');
+    transcriptRef.current = "";
+    setTranscript("");
+    setInterimTranscript("");
     setError(null);
   }, []);
 
@@ -185,7 +195,7 @@ export function useSpeechToText(options: UseSpeechToTextOptions = {}): UseSpeech
     transcript,
     interimTranscript,
     status,
-    isListening: status === 'listening',
+    isListening: status === "listening",
     isSupported,
     error,
     startListening,

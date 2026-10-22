@@ -1,5 +1,7 @@
 # Guía Técnica: Pre y Post-Entrenamiento de Redes Neuronales para LSB
 
+> Estado: propuesta de investigación heredada de la rama Apaza. Arquitecturas, parámetros, aumentos y métricas son opciones por evaluar, no decisiones aprobadas ni resultados medidos. Valida cada opción con experimentos reproducibles y el benchmark del proyecto.
+
 Esta guía detalla la arquitectura, estrategias de pre-entrenamiento, aumentación de datos y post-procesamiento para construir modelos de:
 1. **Isolated Sign Language Recognition (ISLR):** Reconocimiento de señas individuales.
 2. **Continuous Sign Language Recognition (CSLR):** Reconocimiento continuo de secuencias de señas $\to$ Glosas.

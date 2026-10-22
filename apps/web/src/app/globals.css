@@ -1,0 +1,396 @@
+:root {
+  color-scheme: light;
+  --ink: #153238;
+  --muted: #52696d;
+  --surface: #ffffff;
+  --canvas: #edf5f3;
+  --accent: #087f73;
+  --accent-dark: #06665d;
+  --border: #d6e3df;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #f6f8f5;
+  color: var(--ink);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid #f0a942;
+  outline-offset: 3px;
+}
+
+.avatar-page {
+  width: min(100% - 2rem, 1180px);
+  margin: 0 auto;
+  padding: clamp(1.5rem, 5vw, 4rem) 0;
+}
+
+.eyebrow {
+  margin: 0 0 0.65rem;
+  color: var(--accent-dark);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.page-heading {
+  max-width: 48rem;
+  margin-bottom: 1.5rem;
+}
+
+.page-heading h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+}
+
+.page-heading p:last-child {
+  max-width: 42rem;
+  margin: 0.9rem 0 0;
+  color: var(--muted);
+  font-size: 1.05rem;
+  line-height: 1.6;
+}
+
+.avatar-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(260px, 0.8fr);
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.avatar-viewer,
+.avatar-controls,
+.voice-card,
+.notice-card {
+  border: 1px solid var(--border);
+  border-radius: 1.25rem;
+  background: var(--surface);
+  box-shadow: 0 12px 36px rgb(21 50 56 / 7%);
+}
+
+.avatar-viewer {
+  position: relative;
+  min-height: 500px;
+  overflow: hidden;
+  background: var(--canvas);
+}
+
+.avatar-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.viewer-hint {
+  position: absolute;
+  right: 1rem;
+  bottom: 1rem;
+  left: 1rem;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  pointer-events: none;
+  text-align: center;
+}
+
+.scene-state {
+  display: grid;
+  min-height: 100%;
+  place-items: center;
+  padding: 2rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.avatar-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.35rem;
+}
+
+.voice-card {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding: 1.35rem;
+}
+
+.voice-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 1rem;
+}
+
+.voice-heading .eyebrow {
+  margin-bottom: 0.4rem;
+}
+
+.voice-heading h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.voice-heading .help-text {
+  max-width: 31rem;
+}
+
+.text-input {
+  width: 100%;
+  min-height: 6rem;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  background: #fff;
+  color: var(--ink);
+  padding: 0.75rem;
+  line-height: 1.5;
+}
+
+.voice-input {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.voice-actions {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.voice-button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 0.55rem;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  padding: 0.55rem 1rem;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.voice-button:hover {
+  background: var(--accent-dark);
+}
+
+.voice-button.is-listening {
+  border-color: #a8322a;
+  background: #a8322a;
+}
+
+.voice-clear-button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.voice-state {
+  color: #a8322a;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.voice-transcript,
+.voice-support-message {
+  min-height: 3.5rem;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 0.7rem;
+  background: #f8faf9;
+  padding: 0.8rem;
+  color: var(--ink);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.voice-placeholder,
+.voice-interim,
+.voice-support-message {
+  color: var(--muted);
+}
+
+.voice-interim {
+  font-style: italic;
+}
+
+.voice-error {
+  margin: 0;
+  color: #9b3229;
+  font-size: 0.85rem;
+}
+
+.avatar-controls h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.control-field {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.control-field label,
+.control-label {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.control-field select,
+.file-picker {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  background: #fff;
+  color: var(--ink);
+  padding: 0.6rem 0.7rem;
+}
+
+.file-picker {
+  padding: 0.45rem;
+}
+
+.help-text,
+.model-name,
+.status-message {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.model-name {
+  overflow-wrap: anywhere;
+}
+
+.status-message[role="alert"] {
+  color: #9b3229;
+}
+
+.control-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.primary-button,
+.secondary-button {
+  min-height: 44px;
+  border: 1px solid var(--accent);
+  border-radius: 0.7rem;
+  cursor: pointer;
+  font-weight: 700;
+  transition: background 140ms ease, color 140ms ease, transform 140ms ease;
+}
+
+.primary-button {
+  background: var(--accent);
+  color: white;
+}
+
+.primary-button:hover:not(:disabled) {
+  background: var(--accent-dark);
+}
+
+.secondary-button {
+  background: white;
+  color: var(--accent-dark);
+}
+
+.secondary-button:hover:not(:disabled) {
+  background: #e8f4f1;
+}
+
+.primary-button:active:not(:disabled),
+.secondary-button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+button:disabled,
+select:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.range-control {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+
+.toggle-row input {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--accent);
+}
+
+.notice-card {
+  margin-top: 1rem;
+  padding: 1rem 1.2rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.notice-card strong {
+  color: var(--ink);
+}
+
+@media (max-width: 760px) {
+  .avatar-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .avatar-viewer {
+    min-height: min(68vh, 560px);
+  }
+
+  .voice-heading {
+    align-items: start;
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

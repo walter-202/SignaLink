@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Extractor del vocabulario oficial LSB desde los 4 PDF del Ministerio de Educación.
+"""Extractor heurístico experimental de texto e imágenes desde documentos PDF.
+
+La salida puede contener errores de glosa, página, módulo o recorte; requiere
+comparación manual con la fuente. Usa solo PDFs cuya extracción y uso estén
+autorizados, y no publiques la salida sin resolver los permisos de redistribución.
 
 Fuente de verdad: "Índice de palabras y señas" de cada módulo (lista oficial).
 Se complementa y enriquece con la sección "Fotografías de señas":
@@ -8,9 +12,9 @@ opción de recorte de imágenes PNG.
 
 Requisitos: pip install pymupdf
 
-Uso:
+Uso (guarda la salida en almacenamiento local, fuera del repositorio):
     python extraer_vocabulario_pdf.py --pdf-dir <carpeta_con_los_pdf> \
-        --out ../references/vocabulario_lsb.json [--crops ../referencias_visuales] [--dpi 150]
+        --out <carpeta_local>/vocabulario_lsb.json [--crops <carpeta_local>/recortes] [--dpi 150]
 """
 import argparse, json, os, re, sys, unicodedata
 

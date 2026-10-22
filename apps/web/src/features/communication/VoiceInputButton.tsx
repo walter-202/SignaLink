@@ -1,23 +1,18 @@
-'use client';
+"use client";
 
-import React from 'react';
-import { useSpeechToText } from './useSpeechToText';
+import { useSpeechToText } from "./useSpeechToText";
 
-interface VoiceInputProps {
+interface VoiceInputButtonProps {
   onTranscriptComplete?: (text: string) => void;
   placeholder?: string;
   className?: string;
 }
 
-/**
- * Componente UI accesible para el dictado por voz del funcionario
- * en la atención al público (Español -> LSB).
- */
-export const VoiceInputButton: React.FC<VoiceInputProps> = ({
+export function VoiceInputButton({
   onTranscriptComplete,
-  placeholder = 'Presiona el micrófono y habla...',
-  className = '',
-}) => {
+  placeholder = "Presiona el micrófono y habla…",
+  className = "",
+}: VoiceInputButtonProps) {
   const {
     transcript,
     interimTranscript,
@@ -28,67 +23,65 @@ export const VoiceInputButton: React.FC<VoiceInputProps> = ({
     stopListening,
     resetTranscript,
   } = useSpeechToText({
-    lang: 'es-BO',
+    lang: "es-BO",
     continuous: true,
     interimResults: true,
-    onFinalResult: (finalText) => {
-      onTranscriptComplete?.(finalText);
-    },
+    onFinalResult: onTranscriptComplete,
   });
 
   if (!isSupported) {
     return (
-      <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-amber-800 text-sm">
-        El dictado por voz nativo no está disponible en este navegador. Por favor utiliza Chrome, Edge o escribe manualmente.
-      </div>
+      <p className={`voice-support-message ${className}`} role="status">
+        El dictado no está disponible en este navegador. Puedes escribir en el
+        campo de texto.
+      </p>
     );
   }
 
   return (
-    <div className={`flex flex-col gap-2 w-full max-w-lg ${className}`}>
-      <div className="flex items-center gap-3">
+    <div className={`voice-input ${className}`}>
+      <div className="voice-actions">
         <button
+          className={isListening ? "voice-button is-listening" : "voice-button"}
           type="button"
           onClick={isListening ? stopListening : startListening}
-          className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium transition-all shadow-sm ${
-            isListening
-              ? 'bg-red-600 text-white animate-pulse hover:bg-red-700'
-              : 'bg-blue-600 text-white hover:bg-blue-700'
-          }`}
-          aria-label={isListening ? 'Detener micrófono' : 'Iniciar micrófono'}
+          aria-label={isListening ? "Detener dictado" : "Iniciar dictado"}
+          aria-pressed={isListening}
         >
-          <span className="text-lg">{isListening ? '⏹️' : '🎙️'}</span>
-          <span>{isListening ? 'Escuchando...' : 'Hablar'}</span>
+          <span aria-hidden="true">{isListening ? "■" : "🎙"}</span>
+          {isListening ? "Detener dictado" : "Dictar"}
         </button>
-
-        {transcript && (
+        {transcript ? (
           <button
+            className="voice-clear-button"
             type="button"
-            onClick={resetTranscript}
-            className="text-xs text-gray-500 hover:text-gray-700 underline"
+            onClick={() => {
+              resetTranscript();
+              onTranscriptComplete?.("");
+            }}
           >
             Limpiar
           </button>
-        )}
+        ) : null}
+        <span className="voice-state" aria-live="polite">
+          {isListening ? "Escuchando" : ""}
+        </span>
       </div>
 
-      {/* Visualización del texto en tiempo real */}
-      <div className="min-h-16 p-3 rounded-lg border border-gray-200 bg-gray-50 text-sm">
+      <p className="voice-transcript" aria-live="polite" aria-atomic="true">
         {transcript ? (
-          <p className="text-gray-900 font-medium">
-            {transcript}{' '}
-            {interimTranscript && (
-              <span className="text-gray-400 italic">{interimTranscript}</span>
-            )}
-          </p>
+          <>
+            {transcript}{" "}
+            {interimTranscript ? <span className="voice-interim">{interimTranscript}</span> : null}
+          </>
         ) : interimTranscript ? (
-          <p className="text-gray-400 italic">{interimTranscript}</p>
+          <span className="voice-interim">{interimTranscript}</span>
         ) : (
-          <p className="text-gray-400 italic">{placeholder}</p>
+          <span className="voice-placeholder">{placeholder}</span>
         )}
-      </div>
+      </p>
 
-      {error && <p className="text-xs text-red-600 font-semibold">{error}</p>}
+      {error ? <p className="voice-error" role="alert">{error}</p> : null}
     </div>
   );
-};
+}

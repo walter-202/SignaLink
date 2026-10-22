@@ -4,7 +4,7 @@
 
 > Proyecto universitario de ingeniería de software, accesibilidad e inteligencia artificial para facilitar la comunicación bidireccional durante trámites presenciales.
 
-**Estado:** Análisis, investigación y preparación arquitectónica.
+**Estado:** Prototipo técnico inicial; incluye un visor 3D para probar modelos de avatar.
 
 **Nombre anterior:** SignaLink.
 
@@ -64,6 +64,7 @@ Este objetivo constituye una formulación preliminar, pendiente de consolidació
 - Dictado de voz cuando exista soporte compatible.
 - Selección de respuestas conocidas con equivalencia LSB validada.
 - Reproducción de videos LSB.
+- Visor experimental para probar modelos 3D y sus clips de animación.
 - Estados de error y alternativas accesibles.
 - Finalización de sesiones y descarte de datos temporales.
 - Interfaz mobile-first.
@@ -74,7 +75,7 @@ Este objetivo constituye una formulación preliminar, pendiente de consolidació
 - Adaptación automática de modelos a partir de conversaciones.
 - Reconocimiento universal de señas.
 - Traducción libre de conversaciones continuas.
-- Generación automática de LSB mediante avatares.
+- Generación automática de señas LSB mediante avatares; el visor 3D actual no valida ni traduce señas.
 - Integraciones institucionales.
 - Administración avanzada de trámites.
 - Traducción ilimitada entre múltiples lenguas de señas.
@@ -425,15 +426,19 @@ Cada skill debe establecer:
 
 ### Skill de corpus LSB
 
-La rama `Apaza` introduce:
+La aportación de `Apaza` se integró de forma selectiva en
+`skill/lsb-corpus-entrenamiento/`: incluye notas provisionales, ocho ejemplos
+ilustrativos y tres scripts experimentales. La guía de la skill documenta el
+alcance y las restricciones; [`references/README.md`](skill/lsb-corpus-entrenamiento/references/README.md)
+registra las fuentes, la auditoría y el estado de derechos.
 
-`skill/lsb-corpus-entrenamiento/`
-
-Esta aportación incluye referencias lingüísticas, vocabulario indexado, guías de entrenamiento y scripts auxiliares.
-
-Su incorporación a `main` requiere revisión de procedencia, consistencia de datos, reglas lingüísticas, licencias y pruebas automatizadas.
-
-Los documentos académicos constituyen referencias de investigación, no datasets completos ni sustitutos de grabaciones reales.
+El archivo `vocabulario_lsb.json` no se incorporó: las fichas oficiales
+consultadas no establecen una licencia de redistribución y la extracción
+presenta IDs duplicados, glosas vacías y referencias de página incompletas.
+Los documentos académicos son referencias de investigación, no datasets
+completos ni sustitutos de grabaciones reales. La información lingüística y los
+ejemplos requieren revisión por una persona competente en LSB antes de usarse
+como reglas del producto o etiquetas aprobadas.
 
 ---
 
@@ -520,7 +525,9 @@ test/accessibility-e2e
 docs/architecture
 ```
 
-La rama histórica `Apaza` será revisada como aportación de corpus antes de integrarse.
+La rama histórica `Apaza` se revisó y se integró selectivamente como material
+provisional; el vocabulario extraído permanece excluido hasta resolver permisos
+y corregir los hallazgos registrados en la skill de corpus LSB.
 
 ### Flujo de contribución
 

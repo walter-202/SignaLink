@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Módulo de post-procesamiento heurístico y basado en reglas para traducir glosas LSB a español.
+"""Baseline heurístico experimental para explorar glosas y texto en español.
 
-Este script sirve como baseline / pre-procesador antes o después de pasar por un LLM / Seq2Seq.
+No es un traductor validado ni una especificación lingüística de LSB. Sus
+resultados requieren revisión humana y no sirven como etiquetas aprobadas ni
+como evidencia de calidad de traducción.
 
 Uso:
     python traductor_glosa_a_texto.py "AYER MAMA PAN COMPRAR"
@@ -65,7 +67,7 @@ def traducir_glosa(glosas_str):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Traducción y post-procesamiento de glosas LSB a español.")
+    parser = argparse.ArgumentParser(description="Baseline experimental de glosas a texto; salida no validada.")
     parser.add_argument("glosas", nargs="?", default="", help="Secuencia de glosas separadas por espacios.")
     parser.add_argument("--batch", help="Ruta a archivo JSON con ejemplos para evaluar.")
     args = parser.parse_args()

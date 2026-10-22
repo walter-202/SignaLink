@@ -1,125 +1,87 @@
 ---
 name: lsb-corpus-entrenamiento
-description: >-
-  Corpus oficial, fonología gestual y pautas integrales de pre-entrenamiento y post-entrenamiento
-  de modelos de Inteligencia Artificial para Lengua de Señas Boliviana (LSB), basado en los 4 módulos
-  oficiales del Ministerio de Educación de Bolivia (Decreto Supremo Nº 0328). Utiliza esta skill para
-  construcción de datasets (1,380+ señas), extracción de poses/landmarks (MediaPipe, OpenPose),
-  entrenamiento de modelos de visión (ISLR, CSLR con CTC loss), y post-procesamiento/fine-tuning
-  de LLMs y modelos Seq2Seq para traducción de señas/glosas a español fluido (Gloss-to-Text).
+description: Plan and document an authorized, reproducible corpus of Lengua de Señas Boliviana recordings and annotations for research and model training.
 ---
 
-# Lengua de Señas Boliviana (LSB) - Corpus y Guía de Pre / Post-Entrenamiento
+# Entrenamiento del corpus LSB
 
-Esta skill proporciona las bases lingüísticas oficiales, el vocabulario completo indexado y las directrices técnicas para diseñar, pre-entrenar, entrenar y post-procesar modelos de **Reconocimiento y Traducción de Lengua de Señas Boliviana (LSB)** a texto en español.
+## Objetivo y activación
 
-El material está fundamentado en los **4 Módulos Oficiales del Curso de Enseñanza de la LSB** publicados por el Ministerio de Educación del Estado Plurinacional de Bolivia y la Federación Boliviana de Sordos (FEBOS) bajo el **Decreto Supremo Nº 0328**:
-* **Módulo 1:** Nivel Básico 1 (285 entradas de vocabulario, 72 multifase).
-* **Módulo 2:** Nivel Básico 2 (322 entradas de vocabulario, 98 multifase).
-* **Módulo 3:** Nivel Intermedio (362 entradas de vocabulario, 142 multifase).
-* **Módulo 4:** Nivel Avanzado (412 entradas de vocabulario, 158 multifase).
-* **Total:** 1,381 señas oficiales indexadas con metadata de páginas, fotos y fotogramas correlativos ($a, b, c...$).
+Usa esta guía al definir vocabulario, grabar señas, etiquetar material o preparar datos de entrenamiento para modelos de Lengua de Señas Boliviana (LSB). El corpus debe representar expresiones y personas con autorización verificable; no se debe completar con datos inventados para cubrir clases.
 
----
+> Estado: guía de trabajo del proyecto. Las notas técnicas vinculadas abajo son propuestas para investigación, no reglas lingüísticas validadas ni parámetros aprobados para producción.
 
-## 1. Arquitectura del Pipeline: De Video a Texto
+## Entradas necesarias
 
-El sistema se estructura en dos fases desacopladas recomendadas por el estado del arte en SLT (Sign Language Translation):
+- Pregunta de investigación y tarea delimitada: clasificación de señas aisladas, reconocimiento continuo u otra.
+- Lista inicial de glosas o expresiones, con fuente y propósito.
+- Protocolo de participación, consentimiento y resguardo aprobado por el equipo académico.
+- Esquema de anotación acordado con la skill de validación lingüística.
+- Destino privado autorizado para videos y datos identificables.
 
-```
-[Video / Cámara Continua LSB]
-            │
-            ▼
-[Extractor de Landmarks 3D (MediaPipe / OpenPose)]
-            │  (Coordenadas x, y, z de manos, pose y rostro)
-            ▼
-┌─────────────────────────────────────────────────────────────┐
-│ FASE 1: PRE-ENTRENAMIENTO Y CSLR (Visión / Grafos)          │
-│ • Backbone: ST-GCN, GCN-Transformer, S3D o ViT             │
-│ • Pre-entrenamiento: Masked Pose Modeling (MPM) / Transfer  │
-│ • Loss de Alineación: CTC (Connectionist Temporal Classif.) │
-└─────────────────────────────────────────────────────────────┘
-            │
-            ▼
-   [Secuencia de Glosas LSB]  (Ej: [AYER] [MAMÁ] [PAN] [COMPRAR])
-            │
-            ▼
-┌─────────────────────────────────────────────────────────────┐
-│ FASE 2: POST-ENTRENAMIENTO Y SLT (Gloss-to-Text)            │
-│ • Modelo: Seq2Seq / LLM (mBART-50, mT5, LoRA Fine-Tuning)  │
-│ • Reglas Lingüísticas: Infilling de artículos/cópulas,     │
-│   reordenamiento SOV -> SVO, flexión temporal.              │
-└─────────────────────────────────────────────────────────────┘
-            │
-            ▼
-[Texto Fluido en Español Estándar]  (Ej: "Ayer mi mamá compró pan.")
-```
+Si falta autorización para grabar o reutilizar material, limita el trabajo a planificar el protocolo y documentar fuentes públicas. No descargues ni copies videos por asumir que su publicación permite reutilizarlos.
 
----
+## Procedimiento
 
-## 2. Pre-Entrenamiento: Preparación y Modelado Visual
+1. Delimita la tarea, población, región y contexto de uso. Registra qué queda fuera del corpus.
+2. Asigna identificadores estables a señas y participantes seudonimizados. Conserva la relación con identidades solo en el sistema restringido que aprobó el equipo.
+3. Para cada término registra glosa provisional, significado previsto, variantes conocidas, fuente bibliográfica, página o marca temporal y estado de validación lingüística.
+4. Define el protocolo de grabación antes de captar datos: cámara, encuadre, iluminación, fondo, frecuencia de cuadros, repeticiones, descansos, instrucciones y metadatos técnicos.
+5. Registra por muestra el identificador de seña, participante seudonimizado, sesión, variante, segmentos temporales, condiciones de captura, consentimiento vigente y anotador.
+6. Separa la grabación original de las versiones procesadas. Registra cada transformación y conserva el original solo en el almacenamiento aprobado.
+7. Revisa muestras y anotaciones con una persona competente en LSB. Marca discrepancias como pendientes; no las conviertas en etiquetas definitivas por mayoría automática.
+8. Entrega a control de calidad un manifiesto de datos sin nombres, contactos ni videos. Coordina con sign-dataset-quality antes de crear particiones.
 
-Para que los modelos de visión reconozcan señas LSB con alta precisión y generalicen frente a diferentes señantes y condiciones de iluminación:
+## Separación de tareas de IA
 
-### 2.1 Normalización de Landmarks (Invarianza de Escala y Posición)
-* Normalizar todos los landmarks restando el punto medio de los hombros ($O = \frac{L_{sh} + R_{sh}}{2}$) y dividiendo entre la distancia biacromial ($\|L_{sh} - R_{sh}\|_2$).
-* Concatenar características cinemáticas: posición normalizada ($P_t$), velocidad ($V_t = P_t - P_{t-1}$) y aceleración ($A_t = V_t - V_{t-1}$).
+Trata como tareas distintas la clasificación de señas aisladas (ISLR), el reconocimiento continuo a glosas (CSLR) y la generación de español desde glosas (Gloss-to-Text). No presentes una métrica de una etapa como resultado de traducción completa.
 
-### 2.2 Estrategias de Pre-Entrenamiento
-1. **Transfer Learning:** Pre-entrenar backbones sobre datasets masivos públicos (WLASL, AUTSL, PHOENIX-2014T, LSA64) para asimilar configuraciones de manos y trayectorias antes de ajustar en LSB.
-2. **Masked Pose Modeling (SSL):** Enmascarar aleatoriamente articulaciones de manos o ventanas temporales y entrenar un encoder espaciotemporal para reconstruir las trayectorias ausentes.
+Para el MVP, el modelo entrega candidatos revisables. La persona usuaria debe poder confirmar, corregir o descartar el texto. El entrenamiento y el post-procesamiento quedan fuera del runtime de la PWA y se evalúan con particiones y datos autorizados.
 
-### 2.3 Reglas de Data Augmentation Específico
-* **Time-Warping:** Variar la velocidad de ejecución ($0.8\times$ a $1.2\times$) mediante remuestreo temporal, reflejando señantes lentos o rápidos.
-* **Jittering espacial gaussiano:** Ruido leve en articulaciones secundarias ($\sigma = 0.005$).
-* **Atención con el espejado horizontal (Horizontal Flip):** La LSB reserva la mano derecha para señas deícticas cefálicas (nariz, ojos) y mano dominante. Al espejar, invertir las etiquetas de mano izquierda/derecha.
+## Material disponible de Apaza
 
-Consulta la guía técnica exhaustiva en:
-* [guia_pre_post_entrenamiento_lsb.md](./references/guia_pre_post_entrenamiento_lsb.md)
-* [parametros_formacionales_y_simbologia.md](./references/parametros_formacionales_y_simbologia.md)
+- Notas de gramática y morfosintaxis en references/gramatica_y_morfosintaxis_lsb.md.
+- Notas de preparación y evaluación de modelos en references/guia_pre_post_entrenamiento_lsb.md.
+- Notas de parámetros formacionales en references/parametros_formacionales_y_simbologia.md.
+- Ejemplos heurísticos sin aprobación lingüística en examples/ejemplos_traduccion_glosa_a_espanol.json.
+- Herramientas experimentales en scripts/.
+- Procedencia, estado de licencia y auditoría del vocabulario en references/README.md.
 
----
+## Restricciones
 
-## 3. Post-Entrenamiento: Traducción de Glosas a Español (Gloss-to-Text)
+- No incluyas videos, audio, rostros identificables ni datos de consentimiento en Git.
+- No publiques el vocabulario extraído de los módulos hasta documentar permisos de redistribución y corregir los hallazgos de calidad descritos en references/README.md.
+- No infieras una seña oficial a partir de una traducción literal, un diccionario de otra lengua o una salida de un modelo.
+- No mezcles datos de entrenamiento, validación y evaluación sin registrar el origen y la regla de partición.
+- No prometas anonimato absoluto para video: el rostro, cuerpo y forma de señar pueden identificar a una persona.
+- No uses una cifra de fotogramas por segundo o características por cuadro como regla universal; documenta y justifica la configuración de cada experimento.
+- No conviertas las notas de gramática en una regla del modelo sin validación lingüística con fuente y página.
 
-El post-entrenamiento enseña al modelo de lenguaje (Seq2Seq / LLM) a subsanar la discrepancia gramatical entre la LSB y el español:
+## Resultados esperados
 
-### 3.1 Transformaciones Sintácticas Críticas
-1. **Reordenamiento Temporal y de Argumentos (T-S-O-V $\to$ SVO):**
-   * Glosa: `[AYER] [PAN] [MAMÁ] [COMPRAR]` $\to$ Texto: *"Ayer mi mamá compró pan."*
-2. **Inserción de Cópulas (*Ser / Estar*):**
-   * En LSB no existen verbos cópula. Glosa: `[HERMANO] [MÍO] [MÉDICO]` $\to$ Texto: *"Mi hermano es médico."*
-   * Glosa: `[YO] [TRISTE]` $\to$ Texto: *"Estoy triste."*
-3. **Infilling de Artículos y Preposiciones:**
-   * La LSB prescinde de artículos (*el, la, los*) y las preposiciones van embebidas en los verbos direccionales.
-   * Glosa: `[MAÑANA] [YO] [LA-PAZ] [VIAJAR]` $\to$ Texto: *"Mañana viajaré a La Paz."*
-4. **Desambiguación Léxica Contextual:**
-   * La seña `[FALTAR]` tiene articulaciones distintas en el Módulo 4 según el dominio: ausencia a clase (*"Él faltó a la escuela"*) vs. carencia de insumo (*"Falta arroz"*).
+- Protocolo de recolección versionado en docs/research.
+- Catálogo de etiquetas y manifiesto de muestras sin datos personales.
+- Registro de consentimiento y permisos en el sistema privado aprobado.
+- Informe de cobertura, variantes, exclusiones y limitaciones.
 
-Consulta las reglas detalladas y ejemplos en:
-* [gramatica_y_morfosintaxis_lsb.md](./references/gramatica_y_morfosintaxis_lsb.md)
-* [ejemplos_traduccion_glosa_a_espanol.json](./examples/ejemplos_traduccion_glosa_a_espanol.json)
+## Verificación
 
----
+- Cada etiqueta tiene fuente y estado lingüístico explícitos.
+- Cada muestra tiene consentimiento y procedencia comprobables.
+- Los archivos privados no aparecen en el árbol Git.
+- La partición de evaluación puede reconstruirse sin mezclar participantes.
+- Una persona distinta del anotador puede revisar el esquema y reproducir la preparación.
 
-## 4. Scripts y Herramientas Incluidas
+## Ejemplo
 
-La carpeta `scripts/` contiene herramientas listas para usar en pipelines de datos y evaluación:
+Al proponer una nueva seña, registra primero su fuente y estado como propuesta, solicita revisión lingüística y define el consentimiento y protocolo de captura. Solo después de aprobar esos pasos se graban muestras; los videos permanecen en almacenamiento privado.
 
-| Script | Propósito y Uso |
-| :--- | :--- |
-| `extraer_vocabulario_pdf.py` | Extrae y normaliza el corpus desde los 4 PDFs oficiales a JSON. Incluye soporte para recorte de imágenes de referencia (`--crops`). |
-| `buscar_sena.py` | Consulta interactiva del diccionario oficial por palabra, glosa, módulo (`--modulo M1`) o señas multifase (`--multifase`). |
-| `traductor_glosa_a_texto.py` | Motor de traducción por reglas / post-procesador de glosas LSB a oraciones en español. Soporta modo interactivo y `--batch`. |
+## Scripts asociados
 
-Ejemplos de ejecución en terminal:
-```bash
-# Consultar una seña en el corpus oficial:
-python scripts/buscar_sena.py "familia"
+Los scripts de scripts/ son experimentales. El extractor requiere archivos PDF autorizados y puede generar metadatos incorrectos; revisa el resultado antes de usarlo. El buscador requiere un vocabulario local generado y autorizado, no incluido en este repositorio. El traductor por reglas es solo un baseline ilustrativo y no puede producir traducciones LSB garantizadas.
 
-# Probar traducción y post-procesamiento de glosas:
-python scripts/traductor_glosa_a_texto.py "AYER MAMA PAN COMPRAR"
+## Fuentes y fundamentos
 
-# Evaluar el set de pruebas sintácticas:
-python scripts/traductor_glosa_a_texto.py --batch ../examples/ejemplos_traduccion_glosa_a_espanol.json
-```
+- Fichas oficiales de los módulos, con atribución y estado de derechos, en references/README.md.
+- Protocolo institucional de ética y tratamiento de datos aplicable al proyecto.
+- skill/lsb-linguistic-validation/SKILL.md y skill/sign-dataset-quality/SKILL.md.

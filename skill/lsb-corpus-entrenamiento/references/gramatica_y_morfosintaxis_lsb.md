@@ -1,5 +1,7 @@
 # Gramática, Morfosintaxis y Estructura Lingüística de la LSB
 
+> Estado: notas provisionales heredadas de la rama Apaza. Las generalizaciones y ejemplos requieren revisión de una persona competente en LSB y citas de módulo y página. No son especificaciones normativas ni deben codificarse en el producto sin validación.
+
 Este documento compila las reglas morfosintácticas, mecanismos de concordancia espacial y estructuras gramaticales de la Lengua de Señas Boliviana (LSB) descritas a lo largo de los cuatro módulos oficiales.
 
 ---
