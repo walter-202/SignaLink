@@ -25,6 +25,7 @@ export default defineConfig({
     command: "pnpm dev --hostname 127.0.0.1 --port 3100",
     url: "http://127.0.0.1:3100/atender",
     cwd: ".",
+    env: { NEXT_PUBLIC_SIGN_LANDMARKS: "off" },
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

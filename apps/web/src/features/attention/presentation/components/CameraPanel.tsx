@@ -7,21 +7,25 @@ import {
   Hand,
   LoaderCircle,
   RotateCcw,
+  ScanFace,
   ShieldCheck,
   TriangleAlert,
   VideoOff,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Select } from "@/components/ui/Select";
 import { useAttentionStore } from "@/features/attention/application/attention-store";
 import type { CameraStatus, UseCameraReturn } from "@/features/camera";
+import { LandmarkOverlay, useLandmarkDetection } from "@/features/sign-recognition";
 
 const recognitionModels = [
   { value: "demo", label: "Modelo de referencia · desconectado" },
   { value: "fixture", label: "Interpretación fija · demostración" },
 ];
+
+const landmarksEnabledByDefault = process.env.NEXT_PUBLIC_SIGN_LANDMARKS !== "off";
 
 interface CameraPanelProps {
   camera: UseCameraReturn;
@@ -30,6 +34,8 @@ interface CameraPanelProps {
 export function CameraPanel({ camera }: CameraPanelProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [model, setModel] = useState("demo");
+  const [landmarksEnabled, setLandmarksEnabled] = useState(landmarksEnabledByDefault);
+  const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const previousStatusRef = useRef<CameraStatus>("idle");
   const captureStatus = useAttentionStore((state) => state.captureStatus);
@@ -43,6 +49,14 @@ export function CameraPanel({ camera }: CameraPanelProps) {
   const captureBusy = captureStatus === "capturing" || captureStatus === "processing";
   const canCapture = sessionActive && camera.isActive && !captureBusy;
   const canUseDemo = sessionActive && !captureBusy;
+  const landmarkDetection = useLandmarkDetection({
+    video: videoElement,
+    enabled: camera.isActive && landmarksEnabled,
+  });
+  const setVideoRef = useCallback((node: HTMLVideoElement | null) => {
+    videoRef.current = node;
+    setVideoElement(node);
+  }, []);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -77,6 +91,20 @@ export function CameraPanel({ camera }: CameraPanelProps) {
         : camera.isSupported
           ? { label: "Cámara apagada", className: "camera-status-chip--idle" }
           : { label: "Cámara no disponible", className: "camera-status-chip--idle" };
+
+  const landmarkStatus = !landmarksEnabled
+    ? { label: "Landmarks apagados", className: "camera-landmark-chip--idle" }
+    : landmarkDetection.status === "ready"
+      ? { label: "Landmarks activos", className: "camera-landmark-chip--active" }
+      : landmarkDetection.status === "loading"
+        ? { label: "Cargando landmarks…", className: "camera-landmark-chip--pending" }
+        : landmarkDetection.status === "error"
+          ? { label: "Landmarks no disponibles", className: "camera-landmark-chip--error" }
+          : { label: "Landmarks en espera", className: "camera-landmark-chip--idle" };
+  const landmarkStatusTitle = landmarkDetection.error
+    ?? (landmarksEnabled
+      ? "La pose y las manos se procesan localmente en este navegador."
+      : "Activa la detección local de landmarks en los ajustes de captura.");
 
   let stageTitle = "Activa la vista previa";
   let stageMessage = "Actívala cuando la persona esté lista para acompañar la conversación con señas.";
@@ -133,16 +161,21 @@ export function CameraPanel({ camera }: CameraPanelProps) {
 
       <div className={`camera-viewport ${camera.stream ? "camera-viewport--live" : ""}`}>
         {camera.stream ? (
-          <video
-            ref={videoRef}
-            className="camera-video"
-            autoPlay
-            muted
-            playsInline
-            controls={false}
-            disablePictureInPicture
-            aria-label="Vista previa en vivo de la cámara"
-          />
+          <>
+            <video
+              ref={setVideoRef}
+              className="camera-video"
+              autoPlay
+              muted
+              playsInline
+              controls={false}
+              disablePictureInPicture
+              aria-label="Vista previa en vivo de la cámara"
+            />
+            {videoElement ? (
+              <LandmarkOverlay video={videoElement} frame={landmarkDetection.landmarks} />
+            ) : null}
+          </>
         ) : (
           <div
             className={`camera-stage camera-stage--${sessionActive ? camera.status : "finished"}`}
@@ -214,7 +247,16 @@ export function CameraPanel({ camera }: CameraPanelProps) {
 
         {camera.stream ? (
           <div className="camera-live-overlay">
-            <span><ShieldCheck size={13} aria-hidden="true" /> Vista local</span>
+            <div className="camera-live-meta">
+              <span><ShieldCheck size={13} aria-hidden="true" /> Vista local</span>
+              <span
+                className={`camera-landmark-chip ${landmarkStatus.className}`}
+                role="status"
+                title={landmarkStatusTitle}
+              >
+                <ScanFace size={13} aria-hidden="true" /> {landmarkStatus.label}
+              </span>
+            </div>
             <Button className="camera-live-stop" variant="ghost" size="small" onClick={camera.stop}>
               <VideoOff size={14} aria-hidden="true" /> Detener cámara
             </Button>
@@ -259,7 +301,7 @@ export function CameraPanel({ camera }: CameraPanelProps) {
 
       <p className="camera-disclaimer">
         <ShieldCheck size={14} aria-hidden="true" />
-        Vista previa local, sin grabación. El reconocimiento es una demostración.
+        Vista previa y landmarks locales, sin grabación. El reconocimiento es una demostración.
       </p>
 
       <Dialog
@@ -278,8 +320,16 @@ export function CameraPanel({ camera }: CameraPanelProps) {
             onValueChange={setModel}
             className="select-trigger--full"
           />
-          <p className="help-text">El modelo no está conectado. La captura devuelve una frase fija para probar el flujo.</p>
+          <p className="help-text">El modelo de interpretación no está conectado. La captura devuelve una frase fija para probar el flujo.</p>
         </div>
+        <label className="setting-row">
+          <span><strong>Detectar landmarks en el navegador</strong><small>MediaPipe procesa la pose y las manos localmente; el video no se envía.</small></span>
+          <input
+            type="checkbox"
+            checked={landmarksEnabled}
+            onChange={(event) => setLandmarksEnabled(event.currentTarget.checked)}
+          />
+        </label>
         <label className="setting-row">
           <span><strong>Simular un error en la próxima captura</strong><small>La siguiente captura mostrará un error para probar el reintento.</small></span>
           <input type="checkbox" checked={failNext} onChange={(event) => setFailNext(event.currentTarget.checked)} />
