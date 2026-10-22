@@ -12,6 +12,16 @@ interface ConversationPanelProps {
   onUseSigns: () => void;
 }
 
+function getMessageSourceLabel(source: ConversationMessage["source"]): string {
+  switch (source) {
+    case "reviewed-sign": return "captura de demostración revisada";
+    case "frequent-phrase": return "frase frecuente";
+    case "dictation": return "dictado del navegador";
+    case "demo": return "demostración";
+    case "typed": return "texto";
+  }
+}
+
 export function ConversationPanel({ onRespond, onUseSigns }: ConversationPanelProps) {
   const messages = useAttentionStore((state) => state.messages);
   const captureStatus = useAttentionStore((state) => state.captureStatus);
@@ -68,7 +78,7 @@ export function ConversationPanel({ onRespond, onUseSigns }: ConversationPanelPr
                 aria-label={`Ver detalle del mensaje de ${isCitizen ? "la persona usuaria" : "personal de atención"}: ${message.text}`}
               >
                 <span className="message-author">
-                  {isCitizen ? "Persona usuaria · LSB → Español (demo)" : "Personal de atención · texto"}
+                  {isCitizen ? "Persona usuaria · LSB → Español (demo)" : `Personal de atención · ${getMessageSourceLabel(message.source)}`}
                 </span>
                 <span className="message-text">{message.text}</span>
                 <span className="message-meta">
@@ -142,7 +152,7 @@ export function ConversationPanel({ onRespond, onUseSigns }: ConversationPanelPr
           <div className="message-detail">
             <p>{selectedMessage.text}</p>
             <span>Estado: {selectedMessage.state === "confirmed" ? "revisado" : "enviado"}</span>
-            <span>Origen: {selectedMessage.source === "reviewed-sign" ? "captura de demostración revisada" : selectedMessage.source === "frequent-phrase" ? "frase frecuente" : "texto"}</span>
+            <span>Origen: {getMessageSourceLabel(selectedMessage.source)}</span>
           </div>
         ) : null}
       </Dialog>
