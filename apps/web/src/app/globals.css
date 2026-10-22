@@ -425,6 +425,10 @@ h1, h2, h3, p { margin-top: 0; }
 .character-count { color: #667085; font-size: 0.62rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .composer-tools { display: flex; flex-wrap: wrap; gap: 5px; }
 .composer-tools .ui-button { min-height: 31px; }
+.voice-input { display: inline-flex; max-width: 100%; flex-wrap: wrap; align-items: center; gap: 4px; }
+.voice-input-status, .voice-input-error { font-size: 0.63rem; line-height: 1.35; }
+.voice-input-status { color: var(--muted); }
+.voice-input-error { color: #b42318; }
 .frequent-phrases { display: grid; gap: 4px; border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 5px; }
 .frequent-phrases button { border: 0; border-radius: 6px; background: transparent; color: #344054; cursor: pointer; padding: 0.5rem; font-size: 0.67rem; line-height: 1.35; text-align: left; }
 .frequent-phrases button:hover, .frequent-phrases button:focus-visible { background: #edf8f8; }

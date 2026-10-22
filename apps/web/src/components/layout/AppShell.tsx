@@ -85,7 +85,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           ) : (
             <span className="attention-live attention-live--quiet">Sin atención activa</span>
           )}
-          <span className="clock-label" aria-label={`Hora local ${clock}`}>
+          <span className="clock-label">
             <Clock3 size={16} aria-hidden="true" />
             <time>{clock || "--:--"}</time>
           </span>
@@ -123,6 +123,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
                   className={`navigation-link ${current ? "navigation-link--active" : ""}`}
                   href={href}
                   key={href}
+                  aria-label={label}
                   aria-current={current ? "page" : undefined}
                   title={collapsed ? label : undefined}
                   onClick={() => setMobileOpen(false)}

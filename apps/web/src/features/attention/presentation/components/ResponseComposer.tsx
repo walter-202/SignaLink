@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, type Ref } from "react";
-import { Bookmark, Info, Keyboard, Mic, Send } from "lucide-react";
+import { useRef, useState, type Ref } from "react";
+import { Bookmark, Info, Keyboard, Send } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
+import { VoiceInputButton } from "@/features/communication";
 import { useAttentionStore } from "@/features/attention/application/attention-store";
 
 const frequentPhrases = [
@@ -23,21 +24,29 @@ export function ResponseComposer({ textareaRef }: ResponseComposerProps) {
   const sendReply = useAttentionStore((state) => state.sendReply);
   const records = useAttentionStore((state) => state.records);
   const activeRecordId = useAttentionStore((state) => state.activeRecordId);
-  const [source, setSource] = useState<"typed" | "frequent-phrase" | "demo">("typed");
+  const [source, setSource] = useState<"typed" | "frequent-phrase" | "dictation">("typed");
   const [phrasesOpen, setPhrasesOpen] = useState(false);
-  const [dictationNotice, setDictationNotice] = useState("");
+  const [dictationActive, setDictationActive] = useState(false);
+  const [composerNotice, setComposerNotice] = useState("");
   const [infoOpen, setInfoOpen] = useState(false);
+  const dictationBaseRef = useRef("");
   const sessionActive = records.find((record) => record.id === activeRecordId)?.status === "active";
 
   function handleSend() {
     if (sendReply(source)) setSource("typed");
   }
 
-  function simulateDictation() {
-    const sample = "Su atención se encuentra en proceso.";
-    setDraft(draft ? `${draft.trim()} ${sample}`.trim() : sample);
-    setSource("demo");
-    setDictationNotice("Se añadió una frase de ejemplo para revisar. No se activó el micrófono.");
+  function startDictation() {
+    dictationBaseRef.current = draft.trim();
+    setSource("dictation");
+    setComposerNotice("");
+  }
+
+  function updateDraftFromDictation(transcript: string) {
+    const text = transcript.trim();
+    if (!text) return;
+    const nextDraft = [dictationBaseRef.current, text].filter(Boolean).join(" ");
+    setDraft(nextDraft.slice(0, 500));
   }
 
   return (
@@ -56,13 +65,13 @@ export function ResponseComposer({ textareaRef }: ResponseComposerProps) {
         rows={2}
         maxLength={500}
         value={draft}
-        disabled={!sessionActive}
-        placeholder={sessionActive ? "Escribe una respuesta en español…" : "Inicia una atención para responder."}
+        disabled={!sessionActive || dictationActive}
+        placeholder={!sessionActive ? "Inicia una atención para responder." : dictationActive ? "El dictado está activo…" : "Escribe una respuesta en español…"}
         aria-describedby={draftError ? "response-error" : "response-counter"}
         onChange={(event) => {
           setDraft(event.currentTarget.value);
           setSource("typed");
-          setDictationNotice("");
+          setComposerNotice("");
         }}
         onKeyDown={(event) => {
           if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
@@ -76,10 +85,13 @@ export function ResponseComposer({ textareaRef }: ResponseComposerProps) {
         <span className="character-count">{draft.length} / 500</span>
       </div>
       <div className="composer-tools">
-        <Button size="small" variant="secondary" onClick={simulateDictation} disabled={!sessionActive}>
-          <Mic size={15} aria-hidden="true" /> Dictar
-        </Button>
-        <Button size="small" variant="secondary" onClick={() => document.getElementById("response-draft")?.focus()} disabled={!sessionActive}>
+        <VoiceInputButton
+          disabled={!sessionActive}
+          onStart={startDictation}
+          onListeningChange={setDictationActive}
+          onTranscriptComplete={updateDraftFromDictation}
+        />
+        <Button size="small" variant="secondary" onClick={() => document.getElementById("response-draft")?.focus()} disabled={!sessionActive || dictationActive}>
           <Keyboard size={15} aria-hidden="true" /> Usar teclado
         </Button>
         <Button
@@ -88,7 +100,7 @@ export function ResponseComposer({ textareaRef }: ResponseComposerProps) {
           aria-expanded={phrasesOpen}
           aria-controls="frequent-phrases"
           onClick={() => setPhrasesOpen((open) => !open)}
-          disabled={!sessionActive}
+          disabled={!sessionActive || dictationActive}
         >
           <Bookmark size={15} aria-hidden="true" /> Frases frecuentes
         </Button>
@@ -97,7 +109,7 @@ export function ResponseComposer({ textareaRef }: ResponseComposerProps) {
           size="small"
           variant="primary"
           onClick={handleSend}
-          disabled={!sessionActive || !draft.trim()}
+          disabled={!sessionActive || dictationActive || !draft.trim()}
           aria-label="Enviar respuesta"
           title="Enviar respuesta"
         >
@@ -114,7 +126,7 @@ export function ResponseComposer({ textareaRef }: ResponseComposerProps) {
                 setDraft(phrase);
                 setSource("frequent-phrase");
                 setPhrasesOpen(false);
-                setDictationNotice("Frase añadida al borrador para revisar.");
+                setComposerNotice("Frase añadida al borrador para revisar.");
               }}
             >
               {phrase}
@@ -122,7 +134,7 @@ export function ResponseComposer({ textareaRef }: ResponseComposerProps) {
           ))}
         </div>
       ) : null}
-      {dictationNotice ? <p className="composer-notice" role="status">{dictationNotice}</p> : null}
+      {composerNotice ? <p className="composer-notice" role="status">{composerNotice}</p> : null}
       <Dialog
         open={infoOpen}
         onOpenChange={setInfoOpen}
@@ -130,7 +142,8 @@ export function ResponseComposer({ textareaRef }: ResponseComposerProps) {
         description="Escribe en español, revisa el mensaje y envíalo cuando esté listo."
       >
         <ul className="dialog-list">
-          <li>El dictado añade una frase fija de ejemplo y no activa el micrófono.</li>
+          <li>El dictado usa el servicio del navegador; el tratamiento del audio depende de ese proveedor.</li>
+          <li>Revisa y corrige la transcripción antes de enviar la respuesta.</li>
           <li>Las frases frecuentes quedan en el borrador para que puedas revisarlas.</li>
           <li>El avatar es una vista de demostración, no una traducción validada a LSB.</li>
         </ul>

@@ -23,8 +23,14 @@ La interfaz de `/atender` y `/historial` se revisó contra la referencia visual 
 ## Verificación automatizada
 
 - ESLint: correcto.
-- Vitest + Testing Library: 7 pruebas correctas.
+- Vitest + Testing Library: 12 pruebas correctas.
 - Playwright: 5 pruebas correctas y 1 omisión intencional en el proyecto de escritorio para el caso exclusivo de tarjetas móviles; el mismo caso pasa en el proyecto móvil.
 - `next build`: correcto; rutas estáticas `/atender` y `/historial`.
 
-Playwright usó Chromium instalado en el sistema mediante `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium`. Los controles de medios, el dictado y la interpretación son simulaciones; el avatar ilustrativo y los datos ficticios no validan traducciones LSB.
+Playwright usó Chromium instalado en el sistema mediante `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium`. La cámara y la interpretación LSB siguen simuladas; el dictado usa Web Speech API del navegador. Los tests sustituyen ese servicio por un adaptador falso y no activan un micrófono real. El avatar ilustrativo y los datos ficticios no validan traducciones LSB.
+
+## Integración del dictado
+
+La build de producción se revisó de nuevo con `agent-browser` en Chromium a 390 × 844. El contenido mantuvo el ancho del viewport y no hubo errores de página ni de consola. axe-core reportó cero violaciones automáticas; dejó pendientes de revisión manual dos contrastes sobre imágenes, en el indicador de cámara y la etiqueta del avatar.
+
+El flujo de servicio se verificó con pruebas del adaptador y del compositor: inicio, resultados parciales/finales, permiso denegado, fallback a teclado y envío con origen `dictation`. La captura real de audio no se activó durante la revisión automatizada.
