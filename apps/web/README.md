@@ -1,6 +1,8 @@
-# Visor de avatar
+# Aplicación web
 
-## Ejecutar
+Prototipo de interfaz para **La Voz de tus Manos**, organizado por funcionalidades y basado en el flujo visual de las vistas de atención e historial.
+
+## Ejecutar localmente
 
 Desde la raíz del repositorio:
 
@@ -9,36 +11,51 @@ pnpm install
 pnpm dev:web
 ```
 
-Abre `http://localhost:3000`. El visor inicia con una figura geométrica
-provisional. Puedes cargar un archivo `.glb` de hasta 25 MB; la vista previa se
-procesa localmente y el archivo no se sube a un servidor. Si el modelo contiene
-clips, aparecerán en el selector para reproducir, pausar, repetir o ajustar la
-velocidad.
+Abre `http://localhost:3000`. La ruta `/` redirige a `/atender`.
 
-## Añadir un modelo local persistente
+## Vistas
 
-1. Guarda un modelo GLB cuya licencia o permiso de uso esté documentado en
-   `apps/web/public/models/avatar.glb`.
-2. Copia `.env.example` a `.env.local` dentro de `apps/web`.
-3. Inicia de nuevo el servidor de desarrollo.
+- **`/atender`**: trámite activo, captura simulada con edición y confirmación, conversación, redacción de respuestas, frases frecuentes, observaciones y vista de avatar.
+- **`/historial`**: búsqueda, filtros por estado y fecha, paginación, resumen de la conversación, detalle, reapertura confirmada y modal con la conversación completa.
 
-El modelo debe tener escala humana, estar orientado hacia el eje `+Z` y contener
-clips con nombres legibles. El visor conserva el rig y los clips integrados en
-el GLB. Todavía no existe un contrato de glosas ni un conjunto de animaciones
-LSB revisadas.
+La interfaz se adapta a móvil, incluye navegación por teclado, etiquetas para controles, estados accesibles, opción de contraste alto y respeto por `prefers-reduced-motion`.
 
-## Dictado de voz
+## Límites de la demostración
 
-La vista incluye una entrada experimental de voz a texto en español de Bolivia
-(`es-BO`) mediante Web Speech API. Está disponible solo en navegadores que la
-implementan; si no, se puede escribir en el campo. El navegador puede enviar o
-procesar el audio mediante sus propios servicios. El dictado solo produce texto:
-no traduce a LSB ni selecciona una animación.
+La cámara no se activa. La propuesta de captura y el dictado son frases fijas para probar la interacción; no hay reconocimiento ni traducción LSB conectados. Los registros se guardan solo en el estado de Zustand mientras el documento está abierto, no usan almacenamiento del navegador y vuelven al fixture al recargar. El avatar de imagen es ilustrativo y no genera señas verificadas. Se puede cargar un `.glb` de hasta 25 MB para probar localmente un modelo y sus clips; el archivo no se envía a un servidor.
 
-## Referencia externa
+Las imágenes de cámara y avatar son recursos generados para la interfaz de demostración. No representan personas usuarias ni contenido lingüístico validado.
 
-El flujo de avatar GLB, reproducción de clips y controles de cámara se estudió
-a partir de [IVILSB_FRONTEND](https://github.com/MayOnesita/IVILSB/tree/master/IVILSB_FRONTEND).
-Ese repositorio no declara una licencia de reutilización. SignaLink no copia sus
-componentes, modelo, animaciones ni texturas; se requiere permiso y atribución
-antes de integrar cualquiera de esos recursos.
+## Estructura
+
+```text
+src/
+  app/                         # App Router y estilos globales
+  components/                  # Shell, controles y feedback compartidos
+  design-system/               # Tokens de color y superficie
+  features/
+    attention/                 # Captura, conversación, respuesta y estado de sesión
+    avatar/                    # Visor GLB reutilizado en la vista previa
+    procedure-history/          # Dominio, fixtures, filtros y vista de historial
+tests/
+  e2e/                         # Flujos de navegador con Playwright
+```
+
+La interfaz usa Next.js, TypeScript, Tailwind CSS 4, configuración compatible con shadcn/ui, Radix UI, Lucide, Zustand y Zod. Los controles de diálogo, selección y pestañas se basan en primitivas Radix con estilos propios del producto.
+
+## Verificación
+
+Desde la raíz del repositorio:
+
+```bash
+pnpm lint:web
+pnpm test:web
+pnpm build:web
+pnpm e2e:web
+```
+
+Los tests E2E requieren Chromium disponible para Playwright. Si Chromium ya está instalado en el sistema, se puede indicar su ruta con `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`. La validación manual visual del prototipo se realiza con `agent-browser` y está documentada en [`design-qa.md`](../../design-qa.md).
+
+## Visor GLB y referencia externa
+
+El visor conserva la posibilidad de cargar modelos GLB locales y reproducir sus clips. El flujo de controles se estudió a partir de [IVILSB_FRONTEND](https://github.com/MayOnesita/IVILSB/tree/master/IVILSB_FRONTEND). Ese repositorio no declara una licencia de reutilización; no se copian sus componentes ni recursos.
