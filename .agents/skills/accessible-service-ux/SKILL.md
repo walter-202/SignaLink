@@ -63,4 +63,4 @@ Los analizadores automáticos pueden detectar algunos problemas de interfaz cuan
 
 - W3C, Web Content Accessibility Guidelines (WCAG) 2.2: https://www.w3.org/TR/WCAG22/
 - Objetivos de privacidad y accesibilidad de README.md.
-- Revisión lingüística en skill/lsb-linguistic-validation/SKILL.md.
+- Revisión lingüística en .agents/skills/lsb-linguistic-validation/SKILL.md.

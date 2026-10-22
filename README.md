@@ -252,16 +252,18 @@ models/
   registry/
   fixtures/
 
-skill/
-  lsb-corpus-entrenamiento/
-  lsb-linguistic-validation/
-  sign-model-adapter/
-  sign-dataset-quality/
-  sign-model-benchmark/
-  accessible-service-ux/
-  sign-response-content/
-  architecture-guard/
-  academic-traceability/
+.agents/
+  skills/
+    lsb-corpus-entrenamiento/
+    lsb-linguistic-validation/
+    sign-model-adapter/
+    sign-dataset-quality/
+    sign-model-benchmark/
+    accessible-service-ux/
+    sign-response-content/
+    architecture-guard/
+    academic-traceability/
+    lsb-traduccion-lengua-senas/
 
 supabase/
   migrations/
@@ -411,9 +413,8 @@ Los identificadores se conservarán estables después de aprobar cada elemento.
 
 Las skills son guías especializadas para colaboradores y agentes de desarrollo.
 
-Se almacenarán en:
-
-`skill/<nombre>/SKILL.md`
+Se almacenan en `.agents/skills/<nombre>/SKILL.md`, una ruta que OpenCode descubre
+automáticamente al iniciar una sesión desde el repositorio.
 
 Cada skill debe establecer:
 
@@ -429,9 +430,9 @@ Cada skill debe establecer:
 ### Skill de corpus LSB
 
 La aportación de `Apaza` se integró de forma selectiva en
-`skill/lsb-corpus-entrenamiento/`: incluye notas provisionales, ocho ejemplos
+`.agents/skills/lsb-corpus-entrenamiento/`: incluye notas provisionales, ocho ejemplos
 ilustrativos y tres scripts experimentales. La guía de la skill documenta el
-alcance y las restricciones; [`references/README.md`](skill/lsb-corpus-entrenamiento/references/README.md)
+alcance y las restricciones; [`references/README.md`](.agents/skills/lsb-corpus-entrenamiento/references/README.md)
 registra las fuentes, la auditoría y el estado de derechos.
 
 El archivo `vocabulario_lsb.json` no se incorporó: las fichas oficiales

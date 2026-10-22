@@ -24,7 +24,7 @@ El JSON no se integra en main por ahora. La auditoría del archivo encontró:
 - 51 glosas vacías.
 - 12 registros sin página de referencia.
 
-Además, el conteo de 1.381 no coincide con el inventario previo citado en skill/SKILL.md. No se afirma un total oficial hasta reconciliar los índices de los cuatro módulos y validar el extractor.
+Además, el conteo de 1.381 no coincide con el inventario previo citado en `.agents/skills/lsb-traduccion-lengua-senas/SKILL.md`. No se afirma un total oficial hasta reconciliar los índices de los cuatro módulos y validar el extractor.
 
 ## Requisitos antes de publicar el JSON
 

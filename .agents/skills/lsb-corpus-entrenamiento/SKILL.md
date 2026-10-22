@@ -84,4 +84,4 @@ Los scripts de scripts/ son experimentales. El extractor requiere archivos PDF a
 
 - Fichas oficiales de los módulos, con atribución y estado de derechos, en references/README.md.
 - Protocolo institucional de ética y tratamiento de datos aplicable al proyecto.
-- skill/lsb-linguistic-validation/SKILL.md y skill/sign-dataset-quality/SKILL.md.
+- .agents/skills/lsb-linguistic-validation/SKILL.md y .agents/skills/sign-dataset-quality/SKILL.md.

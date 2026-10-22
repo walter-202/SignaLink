@@ -61,4 +61,4 @@ No se automatiza la aprobación lingüística. Cuando exista un esquema de glosa
 
 - Materiales oficiales de enseñanza de LSB citados en README.md; registra módulo, edición y página concreta en cada decisión.
 - Consulta y revisión por personas usuarias de LSB con consentimiento y compensación acordes al protocolo del proyecto.
-- skill/lsb-corpus-entrenamiento/SKILL.md y skill/sign-response-content/SKILL.md.
+- .agents/skills/lsb-corpus-entrenamiento/SKILL.md y .agents/skills/sign-response-content/SKILL.md.

@@ -62,6 +62,6 @@ No hay un analizador automático de dataset porque el formato aún debe fijarse.
 ## Fuentes y fundamentos
 
 - Protocolo de datos y consentimientos aprobado para el proyecto.
-- Esquema de recolección en skill/lsb-corpus-entrenamiento/SKILL.md.
-- Criterios de validez lingüística en skill/lsb-linguistic-validation/SKILL.md.
-- Plan de medición en skill/sign-model-benchmark/SKILL.md.
+- Esquema de recolección en .agents/skills/lsb-corpus-entrenamiento/SKILL.md.
+- Criterios de validez lingüística en .agents/skills/lsb-linguistic-validation/SKILL.md.
+- Plan de medición en .agents/skills/sign-model-benchmark/SKILL.md.

@@ -56,4 +56,4 @@ No hay un verificador de trazabilidad porque aún no existe un formato estructur
 
 - Convenciones EP, HU, RF, RNF, N, OE, ADR y M definidas en README.md.
 - Bibliografía del proyecto en README.md y docs/academic.
-- Protocolos de evaluación y privacidad en skill/sign-model-benchmark/SKILL.md y skill/accessible-service-ux/SKILL.md.
+- Protocolos de evaluación y privacidad en .agents/skills/sign-model-benchmark/SKILL.md y .agents/skills/accessible-service-ux/SKILL.md.

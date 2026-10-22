@@ -69,4 +69,4 @@ Los fixtures y pruebas del contrato deben vivir junto al runtime o adaptador que
 - Contratos y manifiestos descritos en README.md.
 - ONNX Runtime Web: https://onnxruntime.ai/docs/tutorials/web/
 - MediaPipe Tasks Vision: https://ai.google.dev/edge/mediapipe/solutions/guide
-- skill/sign-model-benchmark/SKILL.md.
+- .agents/skills/sign-model-benchmark/SKILL.md.

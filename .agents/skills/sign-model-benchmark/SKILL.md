@@ -62,5 +62,5 @@ Los experimentos y sus configuraciones pertenecen a model-lab. No hay un comando
 ## Fuentes y fundamentos
 
 - Contratos y candidatos descritos en README.md.
-- skill/sign-dataset-quality/SKILL.md.
+- .agents/skills/sign-dataset-quality/SKILL.md.
 - Documentación de ONNX Runtime Web: https://onnxruntime.ai/docs/tutorials/web/

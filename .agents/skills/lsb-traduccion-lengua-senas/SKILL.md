@@ -8,7 +8,7 @@ description: >-
 # Índice de trabajo para LSB
 
 Esta skill dirige al equipo a la guía especializada de corpus en
-[`skill/lsb-corpus-entrenamiento/SKILL.md`](./lsb-corpus-entrenamiento/SKILL.md).
+[`.agents/skills/lsb-corpus-entrenamiento/SKILL.md`](../lsb-corpus-entrenamiento/SKILL.md).
 No es una gramática normativa ni un corpus lingüístico aprobado. Las notas
 heredadas de la rama Apaza se mantienen como material provisional hasta que una
 persona competente en LSB las contraste con las fuentes y documente su revisión.
@@ -29,7 +29,7 @@ revisar y corregir.
 ## Estado de las referencias
 
 Las fichas del Ministerio de Educación enlazadas en
-[`references/README.md`](./lsb-corpus-entrenamiento/references/README.md)
+[`references/README.md`](../lsb-corpus-entrenamiento/references/README.md)
 identifican los cuatro módulos de enseñanza. La ficha consultada no declara una
 licencia de redistribución; por ello, el vocabulario extraído no se incluye en
 este repositorio. El informe también registra los defectos encontrados en la

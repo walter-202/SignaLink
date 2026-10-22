@@ -59,6 +59,6 @@ No hay generador automático de videos o equivalencias. Una vez definido el esqu
 
 ## Fuentes y fundamentos
 
-- Reglas de aprobación y variantes en skill/lsb-linguistic-validation/SKILL.md.
+- Reglas de aprobación y variantes en .agents/skills/lsb-linguistic-validation/SKILL.md.
 - Requisitos de contenido bidireccional en README.md.
 - WCAG 2.2 para controles multimedia: https://www.w3.org/TR/WCAG22/

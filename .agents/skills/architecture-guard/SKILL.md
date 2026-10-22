@@ -65,5 +65,5 @@ No hay una regla automatizada de arquitectura configurada todavía. Cuando exist
 ## Fuentes y fundamentos
 
 - Principios Screaming Architecture, Feature-First, Clean Architecture, Ports & Adapters y Modular Monolith definidos en README.md.
-- Contratos de modelos en skill/sign-model-adapter/SKILL.md.
+- Contratos de modelos en .agents/skills/sign-model-adapter/SKILL.md.
 - Decisiones vigentes en docs/architecture/adr.
