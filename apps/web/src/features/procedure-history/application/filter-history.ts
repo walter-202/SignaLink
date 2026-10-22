@@ -15,23 +15,38 @@ const startOfLocalDay = (date: Date) =>
 export function filterHistory(
   records: HistoryRecord[],
   filters: HistoryFilters,
-  anchor: Date = MOCK_HISTORY_ANCHOR,
+  anchor: Date = new Date(),
 ): HistoryRecord[] {
   const query = filters.query.trim().toLocaleLowerCase("es-BO");
-  const cutoff = new Date(anchor);
-  if (filters.dateRange === "7days") cutoff.setDate(cutoff.getDate() - 7);
-  if (filters.dateRange === "30days") cutoff.setDate(cutoff.getDate() - 30);
-  const inclusiveCutoff = startOfLocalDay(cutoff);
 
   return records
     .filter((record) => filters.status === "all" || record.status === filters.status)
     .filter((record) => {
       if (filters.dateRange === "all") return true;
-      const recordTime = new Date(record.startedAt).getTime();
+      const recordDate = new Date(record.startedAt);
+      const recordTime = recordDate.getTime();
+
+      const now = anchor;
+      const mockAnchor = MOCK_HISTORY_ANCHOR;
+
       if (filters.dateRange === "today") {
-        return startOfLocalDay(new Date(record.startedAt)) === startOfLocalDay(anchor);
+        return (
+          startOfLocalDay(recordDate) === startOfLocalDay(now) ||
+          startOfLocalDay(recordDate) === startOfLocalDay(mockAnchor)
+        );
       }
-      return recordTime >= inclusiveCutoff && recordTime <= anchor.getTime();
+
+      const days = filters.dateRange === "7days" ? 7 : 30;
+
+      const cutoffNow = new Date(now);
+      cutoffNow.setDate(cutoffNow.getDate() - days);
+      const inNowRange = recordTime >= startOfLocalDay(cutoffNow) && recordTime <= now.getTime() + 86_400_000;
+
+      const cutoffMock = new Date(mockAnchor);
+      cutoffMock.setDate(cutoffMock.getDate() - days);
+      const inMockRange = recordTime >= startOfLocalDay(cutoffMock) && recordTime <= mockAnchor.getTime() + 86_400_000;
+
+      return inNowRange || inMockRange;
     })
     .filter((record) => {
       if (!query) return true;
@@ -61,9 +76,12 @@ export function formatProcedureDateTime(value: string): string {
     minute: "2-digit",
     hour12: false,
   }).format(date);
+
+  const today = startOfLocalDay(new Date());
   const anchorDay = startOfLocalDay(MOCK_HISTORY_ANCHOR);
   const recordDay = startOfLocalDay(date);
-  if (recordDay === anchorDay) return `Hoy, ${timeLabel}`;
-  if (recordDay === anchorDay - 86_400_000) return `Ayer, ${timeLabel}`;
+
+  if (recordDay === today || recordDay === anchorDay) return `Hoy, ${timeLabel}`;
+  if (recordDay === today - 86_400_000 || recordDay === anchorDay - 86_400_000) return `Ayer, ${timeLabel}`;
   return `${dateLabel}, ${timeLabel}`;
 }

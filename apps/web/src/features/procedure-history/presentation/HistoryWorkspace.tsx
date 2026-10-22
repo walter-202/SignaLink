@@ -27,11 +27,12 @@ export function HistoryWorkspace() {
   const [filters, setFilters] = useState<HistoryFiltersType>({
     query: "",
     status: "all",
-    dateRange: "30days",
+    dateRange: "all",
   });
   const [page, setPage] = useState(1);
-  const [selectedId, setSelectedId] = useState(records[0]?.id ?? "");
   const filteredRecords = filterHistory(records, filters);
+  const [selectedId, setSelectedId] = useState(filteredRecords[0]?.id ?? "");
+
   const pageCount = Math.max(1, Math.ceil(filteredRecords.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount);
   const pageRecords = filteredRecords.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
@@ -46,7 +47,7 @@ export function HistoryWorkspace() {
   }
 
   function clearFilters() {
-    setFilters({ query: "", status: "all", dateRange: "30days" });
+    setFilters({ query: "", status: "all", dateRange: "all" });
     setPage(1);
   }
 
