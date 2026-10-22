@@ -1,0 +1,74 @@
+[
+  {
+    "id": "ejemplo_01",
+    "modulo_origen": "M1",
+    "categoria": "Saludos / Familia",
+    "glosa_lsb": "HOLA MAMÁ CÓMO-ESTÁS",
+    "espanol_literal": "Hola mamá ¿cómo estás?",
+    "espanol_natural": "¡Hola mamá! ¿Cómo estás?",
+    "reglas_aplicadas": ["Saludo y pregunta polar directa", "Puntuación interrogativa"]
+  },
+  {
+    "id": "ejemplo_02",
+    "modulo_origen": "M1 / M2",
+    "categoria": "Tiempo / Alimentos",
+    "glosa_lsb": "AYER MAMÁ PAN COMPRAR",
+    "espanol_literal": "Ayer mamá pan comprar",
+    "espanol_natural": "Ayer mi mamá compró pan.",
+    "reglas_aplicadas": ["Reordenamiento SOV a SVO", "Inflexión verbal a pretérito perfecto simple", "Inserción de posesivo 'mi'"]
+  },
+  {
+    "id": "ejemplo_03",
+    "modulo_origen": "M1 / M4",
+    "categoria": "Pronombres / Lugares",
+    "glosa_lsb": "MAÑANA YO LA-PAZ VIAJAR",
+    "espanol_literal": "Mañana yo La Paz viajar",
+    "espanol_natural": "Mañana viajaré a La Paz.",
+    "reglas_aplicadas": ["Inflexión verbal a futuro simple", "Inserción de preposición 'a' incorporada en el verbo direccional"]
+  },
+  {
+    "id": "ejemplo_04",
+    "modulo_origen": "M2 / M3",
+    "categoria": "Familia / Profesiones",
+    "glosa_lsb": "HERMANO MÍO MÉDICO",
+    "espanol_literal": "Hermano mío médico",
+    "espanol_natural": "Mi hermano es médico.",
+    "reglas_aplicadas": ["Inserción de cópula 'es'", "Ajuste de orden posesivo antepuesto"]
+  },
+  {
+    "id": "ejemplo_05",
+    "modulo_origen": "M3 / M4",
+    "categoria": "Diálogo / Emociones",
+    "glosa_lsb": "YO TRISTE NO PODER DORMIR",
+    "espanol_literal": "Yo triste no poder dormir",
+    "espanol_natural": "Estoy triste y no puedo dormir.",
+    "reglas_aplicadas": ["Inserción de cópula de estado 'estoy'", "Concordancia de verbo modal 'puedo'", "Inserción de conector 'y'"]
+  },
+  {
+    "id": "ejemplo_06",
+    "modulo_origen": "M2 / M4",
+    "categoria": "Opuestos / Clima",
+    "glosa_lsb": "HOY CALOR MUCHO",
+    "espanol_literal": "Hoy calor mucho",
+    "espanol_natural": "Hoy hace mucho calor.",
+    "reglas_aplicadas": ["Inserción de verbo impersonal climático 'hace'"]
+  },
+  {
+    "id": "ejemplo_07",
+    "modulo_origen": "M4",
+    "categoria": "Clasificadores / Animales",
+    "glosa_lsb": "VACA PASTO COMER[nerviosamente]",
+    "espanol_literal": "Vaca pasto comer nerviosamente",
+    "espanol_natural": "La vaca come el pasto con nerviosismo.",
+    "reglas_aplicadas": ["Adverbio incorporado en marcador no manual facial", "Inserción de artículos definidos 'La' y 'el'"]
+  },
+  {
+    "id": "ejemplo_08",
+    "modulo_origen": "M3 / M4",
+    "categoria": "Escuela / Trabajo",
+    "glosa_lsb": "ÉL AYER CLASE FALTAR",
+    "espanol_literal": "Él ayer clase faltar",
+    "espanol_natural": "Él faltó a clases ayer.",
+    "reglas_aplicadas": ["Desambiguación de seña FALTAR (ausentismo)", "Flexión en pasado", "Inserción de preposición 'a'"]
+  }
+]
