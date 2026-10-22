@@ -7,9 +7,3 @@ export type {
   SpeechRecognitionSessionOptions,
   SpeechRecognitionUpdate,
 } from "./application/ports/speech-recognition-service";
-
-export * from "./draft-response.types";
-export * from "./quickPhrases.data";
-export * from "./speechDriver";
-export * from "./useDraftResponse";
-export * from "./DraftResponsePanel";
