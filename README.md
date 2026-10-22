@@ -4,7 +4,7 @@
 
 > Proyecto universitario de ingeniería de software, accesibilidad e inteligencia artificial para facilitar la comunicación bidireccional durante trámites presenciales.
 
-**Estado:** Prototipo de interfaz funcional con flujos de atención e historial. Usa datos simulados en memoria; todavía no conecta cámara, reconocimiento LSB, persistencia ni servicios institucionales. El avatar es ilustrativo y no traduce señas.
+**Estado:** Prototipo de interfaz funcional con flujos de atención e historial. Usa datos simulados en memoria; ya conecta la cámara y detecta landmarks localmente con MediaPipe, pero todavía no hay clasificador LSB, persistencia ni servicios institucionales. El avatar es ilustrativo y no traduce señas.
 
 **Nombre anterior:** SignaLink.
 
@@ -12,7 +12,7 @@
 
 **Arquitectura prevista:** PWA modular, reconocimiento mediante modelos intercambiables e inferencia local cuando sea viable.
 
-La implementación actual está en [`apps/web`](apps/web/README.md). Incluye las vistas `/atender` y `/historial`, revisión manual de capturas simuladas, respuestas de ejemplo y filtros sobre registros ficticios.
+La implementación actual está en [`apps/web`](apps/web/README.md). Incluye las vistas `/atender` y `/historial`, cámara con landmarks locales opcionales, revisión manual de capturas simuladas, respuestas de ejemplo y filtros sobre registros ficticios.
 
 ---
 
@@ -207,6 +207,8 @@ https://github.com/freddxvill/Proyecto_Traductor_de_la_LSB
 Su implementación documenta 58 clases, ventanas de 30 fotogramas y 138 características por fotograma.
 
 La integración deberá reproducir el preprocesamiento utilizado originalmente y verificar predicciones equivalentes entre Python y navegador.
+
+La implementación web ya extrae landmarks con MediaPipe Holistic y prepara características de 138 dimensiones, pero el ONNX del repositorio todavía no está conectado ni validado.
 
 ---
 
@@ -592,7 +594,7 @@ Para nuevas integraciones de modelos, se exigen además pruebas de compatibilida
 | Skills LSB | Trabajo disponible en ramas |
 | Modelo LSB propio | No entrenado |
 | Modelo externo LSB | Candidato identificado |
-| PWA funcional | Pendiente de implementación verificable |
+| PWA funcional | Prototipo web funcional; modo offline pendiente |
 | Comunicación bidireccional | Definición funcional |
 | Evaluación con usuarios | Pendiente |
 | Despliegue productivo | Pendiente |

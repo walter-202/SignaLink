@@ -15,16 +15,24 @@ Abre `http://localhost:3000`. La ruta `/` redirige a `/atender`.
 
 ## Vistas
 
-- **`/atender`**: trámite activo, cámara con vista previa y captura simulada con edición y confirmación, conversación, respuestas escritas o dictadas, frases frecuentes, observaciones y vista de avatar.
+- **`/atender`**: trámite activo, cámara con vista previa y landmarks locales opcionales, captura simulada con edición y confirmación, conversación, respuestas escritas o dictadas, frases frecuentes, observaciones y vista de avatar.
 - **`/historial`**: búsqueda, filtros por estado y fecha, paginación, resumen de la conversación, detalle, reapertura confirmada y modal con la conversación completa.
 
 La interfaz se adapta a móvil, incluye navegación por teclado, etiquetas para controles, estados accesibles, opción de contraste alto y respeto por `prefers-reduced-motion`.
 
 ## Límites de la demostración
 
-La cámara usa `getUserMedia` a través de un adaptador y solo se activa con una acción explícita. La vista previa no se graba, no se envía a un servidor y se libera al detenerla, al cambiar de atención o al finalizar la sesión. Si el permiso se deniega o no hay cámara, la persona puede continuar con la captura de demostración o escribir la respuesta. La captura LSB sigue usando una propuesta fija; no hay reconocimiento ni traducción LSB conectados. El dictado ya usa Web Speech API del navegador cuando está disponible, con `es-BO`; el texto final se agrega al borrador y requiere revisión antes del envío. La aplicación no envía el audio a un endpoint propio, aunque el navegador o su proveedor pueden procesarlo según su implementación y políticas. Si el dictado no está disponible o falla, la persona puede escribir la respuesta. Los registros se guardan solo en el estado de Zustand mientras el documento está abierto, no usan almacenamiento del navegador y vuelven al fixture al recargar. El avatar de imagen es ilustrativo y no genera señas verificadas. Se puede cargar un `.glb` de hasta 25 MB para probar localmente un modelo y sus clips; el archivo no se envía a un servidor.
+La cámara usa `getUserMedia` a través de un adaptador y solo se activa con una acción explícita. La vista previa no se graba, no se envía a un servidor y se libera al detenerla, al cambiar de atención o al finalizar la sesión. Si el permiso se deniega o no hay cámara, la persona puede continuar con la captura de demostración o escribir la respuesta. La captura LSB sigue usando una propuesta fija; la app detecta landmarks localmente con MediaPipe, pero no hay clasificador ni traducción LSB conectados. El dictado ya usa Web Speech API del navegador cuando está disponible, con `es-BO`; el texto final se agrega al borrador y requiere revisión antes del envío. La aplicación no envía el audio a un endpoint propio, aunque el navegador o su proveedor pueden procesarlo según su implementación y políticas. Si el dictado no está disponible o falla, la persona puede escribir la respuesta. Los registros se guardan solo en el estado de Zustand mientras el documento está abierto, no usan almacenamiento del navegador y vuelven al fixture al recargar. El avatar de imagen es ilustrativo y no genera señas verificadas. Se puede cargar un `.glb` de hasta 25 MB para probar localmente un modelo y sus clips; el archivo no se envía a un servidor.
 
 Las imágenes del avatar son recursos generados para la interfaz de demostración. No representan personas usuarias ni contenido lingüístico validado.
+
+## Landmarks locales
+
+La feature `sign-recognition` carga MediaPipe Holistic bajo demanda, procesa la vista previa en el navegador y dibuja pose y manos sobre un canvas. No envía video, frames ni landmarks a Supabase ni a un endpoint propio. La detección se puede desactivar desde ajustes o con `NEXT_PUBLIC_SIGN_LANDMARKS=off`; los tests E2E la desactivan para evitar descargar el modelo.
+
+Los artefactos se descargan de CDN por defecto. Para desarrollo reproducible o producción se pueden fijar `NEXT_PUBLIC_MEDIAPIPE_WASM_PATH` y `NEXT_PUBLIC_MEDIAPIPE_HOLISTIC_MODEL_URL` a copias versionadas. Las variables están documentadas en `.env.example`. El clasificador ONNX y las etiquetas LSB todavía no están integrados; por ahora solo se generan landmarks y un vector de 30 × 138 características.
+
+La decisión y sus límites están documentados en el [ADR-001](../../docs/architecture/adr/ADR-001-browser-only-sign-pipeline.md) y la investigación en [browser-sign-recognition.md](../../docs/research/browser-sign-recognition.md).
 
 ## Estructura
 
@@ -36,8 +44,10 @@ src/
   features/
     attention/                 # Captura, conversación, respuesta y estado de sesión
     avatar/                    # Visor GLB reutilizado en la vista previa
+    camera/                    # Puerto y adaptador de getUserMedia
     communication/             # Puerto de voz, adaptador de navegador y controles
     procedure-history/          # Dominio, fixtures, filtros y vista de historial
+    sign-recognition/          # MediaPipe, features 30 × 138 y overlay local
 tests/
   e2e/                         # Flujos de navegador con Playwright
 ```
@@ -56,11 +66,11 @@ La conexión todavía no guarda atenciones ni conversaciones. Esa persistencia s
 
 La comunicación por voz sigue un puerto de aplicación (`SpeechRecognitionService`) con un adaptador para Web Speech API. El compositor depende del contrato y el proveedor de la vista conecta el adaptador del navegador; en pruebas se sustituye por un servicio falso. El adaptador maneja el idioma `es-BO`, resultados parciales y finales, pausa/reinicio de sesión, permisos denegados y errores de disponibilidad.
 
-La cámara sigue un puerto equivalente (`CameraService`) con un adaptador de `getUserMedia`. El hook de presentación gestiona estados de solicitud, permiso denegado, cámara no disponible, detención explícita y liberación de pistas. La captura continúa separada del reconocimiento, que aún es simulado.
+La cámara sigue un puerto equivalente (`CameraService`) con un adaptador de `getUserMedia`. El hook de presentación gestiona estados de solicitud, permiso denegado, cámara no disponible, detención explícita y liberación de pistas. La captura continúa separada del clasificador; `sign-recognition` detecta landmarks localmente, mientras la interpretación textual sigue siendo simulada.
 
 Las siguientes integraciones se añadirán detrás de contratos equivalentes, en este orden:
 
-1. **Reconocimiento LSB:** puerto para un modelo aprobado que reciba una secuencia de captura y devuelva propuestas con modelo/versión y estado revisable. La UI no tratará resultados como traducción confirmada.
+1. **Clasificador LSB:** adaptador ONNX Runtime Web que consuma la secuencia de 30 × 138 features y devuelva propuestas con modelo/versión y estado revisable. La UI no tratará resultados como traducción confirmada.
 2. **Sesiones e historial:** repositorio de aplicación implementado en servidor, con política de retención y permisos definida antes de persistir conversaciones.
 3. **Persistencia y contenido:** Supabase para sesiones, catálogo de modelos y videos LSB, manteniendo la vista previa de cámara fuera del almacenamiento por defecto.
 
