@@ -44,6 +44,14 @@ tests/
 
 La interfaz usa Next.js, TypeScript, Tailwind CSS 4, configuración compatible con shadcn/ui, Radix UI, Lucide, Zustand y Zod. Los controles de diálogo, selección y pestañas se basan en primitivas Radix con estilos propios del producto.
 
+## Conexión con Supabase
+
+El cliente oficial de Supabase está preparado para Next.js App Router. `src/lib/supabase/client.ts` crea el cliente de navegador y `src/lib/supabase/server.ts` crea el cliente de servidor con cookies compatibles con SSR. Ambos usan únicamente la URL del proyecto y una publishable key; nunca se expone una clave `service_role` o `sb_secret`.
+
+Para enlazar un proyecto, copia `apps/web/.env.example` a `apps/web/.env.local` y reemplaza `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` con los valores del diálogo **Connect** de Supabase. Después reinicia `pnpm dev:web`. No es necesario configurar estas variables para ejecutar la demostración actual.
+
+La conexión todavía no guarda atenciones ni conversaciones. Esa persistencia se añadirá cuando se definan la retención, el acceso y las reglas RLS para datos potencialmente sensibles; hasta entonces se conservan los fixtures y el estado en memoria.
+
 ## Servicios y siguiente integración
 
 La comunicación por voz sigue un puerto de aplicación (`SpeechRecognitionService`) con un adaptador para Web Speech API. El compositor depende del contrato y el proveedor de la vista conecta el adaptador del navegador; en pruebas se sustituye por un servicio falso. El adaptador maneja el idioma `es-BO`, resultados parciales y finales, pausa/reinicio de sesión, permisos denegados y errores de disponibilidad.
