@@ -1,12 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, Info, ShieldCheck, Square } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Select } from "@/components/ui/Select";
 import { StatusIndicator } from "@/components/feedback/StatusIndicator";
 import { useAttentionStore } from "@/features/attention/application/attention-store";
+import { useCamera } from "@/features/camera";
 import { formatProcedureDateTime } from "@/features/procedure-history/application/filter-history";
 import { AvatarPreview } from "./components/AvatarPreview";
 import { CameraPanel } from "./components/CameraPanel";
@@ -34,11 +35,20 @@ export function AttentionWorkspace() {
   const notesError = useAttentionStore((state) => state.notesError);
   const setNotes = useAttentionStore((state) => state.setNotes);
   const setMode = useAttentionStore((state) => state.setMode);
-  const startCapture = useAttentionStore((state) => state.startCapture);
   const finishAttention = useAttentionStore((state) => state.finishAttention);
   const startNewAttention = useAttentionStore((state) => state.startNewAttention);
   const record = records.find((item) => item.id === activeRecordId) ?? records[0];
   const sessionActive = record?.status === "active";
+  const camera = useCamera();
+  const stopCamera = camera.stop;
+
+  useEffect(() => {
+    stopCamera();
+  }, [activeRecordId, stopCamera]);
+
+  useEffect(() => {
+    if (!sessionActive) stopCamera();
+  }, [sessionActive, stopCamera]);
 
   function handleRespond() {
     setMode("reply");
@@ -47,7 +57,10 @@ export function AttentionWorkspace() {
 
   function handleCapture() {
     setMode("capture");
-    void startCapture();
+    void camera.start();
+    const panel = document.getElementById("camera-capture-panel");
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    panel?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "nearest" });
   }
 
   function confirmFinish() {
@@ -99,7 +112,7 @@ export function AttentionWorkspace() {
 
       <div className="attention-grid">
         <div className="attention-column attention-column--capture">
-          <CameraPanel />
+          <CameraPanel camera={camera} />
         </div>
         <div className="attention-column attention-column--conversation">
           <ConversationPanel onRespond={handleRespond} onUseSigns={handleCapture} />

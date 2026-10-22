@@ -1,23 +1,37 @@
 "use client";
 
-import * as Tabs from "@radix-ui/react-tabs";
-import Image from "next/image";
-import { Camera, CircleHelp, Cog, Hand, Play } from "lucide-react";
-import { useState } from "react";
+import {
+  Camera,
+  CameraOff,
+  Cog,
+  Hand,
+  LoaderCircle,
+  RotateCcw,
+  ShieldCheck,
+  TriangleAlert,
+  VideoOff,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Select } from "@/components/ui/Select";
 import { useAttentionStore } from "@/features/attention/application/attention-store";
+import type { CameraStatus, UseCameraReturn } from "@/features/camera";
 
 const recognitionModels = [
   { value: "demo", label: "Modelo de referencia · desconectado" },
   { value: "fixture", label: "Interpretación fija · demostración" },
 ];
 
-export function CameraPanel() {
-  const [activeTab, setActiveTab] = useState("capture");
+interface CameraPanelProps {
+  camera: UseCameraReturn;
+}
+
+export function CameraPanel({ camera }: CameraPanelProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [model, setModel] = useState("demo");
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const previousStatusRef = useRef<CameraStatus>("idle");
   const captureStatus = useAttentionStore((state) => state.captureStatus);
   const startCapture = useAttentionStore((state) => state.startCapture);
   const failNext = useAttentionStore((state) => state.failNextRecognition);
@@ -26,118 +40,251 @@ export function CameraPanel() {
   const records = useAttentionStore((state) => state.records);
   const activeRecordId = useAttentionStore((state) => state.activeRecordId);
   const sessionActive = records.find((record) => record.id === activeRecordId)?.status === "active";
+  const captureBusy = captureStatus === "capturing" || captureStatus === "processing";
+  const canCapture = sessionActive && camera.isActive && !captureBusy;
+  const canUseDemo = sessionActive && !captureBusy;
 
-  const modelState = captureStatus === "processing"
-    ? { label: "Procesando", className: "recognition-state--processing" }
-    : captureStatus === "error"
-      ? { label: "Error de prueba", className: "recognition-state--error" }
-      : captureStatus === "reviewing"
-        ? { label: "Revisar propuesta", className: "recognition-state--review" }
-        : { label: "No conectado", className: "recognition-state--idle" };
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !camera.stream) return;
+    video.srcObject = camera.stream;
+    void video.play().catch(() => undefined);
+    return () => {
+      video.srcObject = null;
+    };
+  }, [camera.stream]);
+
+  useEffect(() => {
+    if (camera.isActive && previousStatusRef.current !== "active") {
+      document.getElementById("camera-shutter")?.focus({ preventScroll: true });
+    } else if (!camera.isActive && previousStatusRef.current === "active") {
+      document.getElementById("camera-primary-action")?.focus({ preventScroll: true });
+    }
+    previousStatusRef.current = camera.status;
+  }, [camera.isActive, camera.status]);
+
+  function handleDemoCapture() {
+    setMode("capture");
+    void startCapture();
+  }
+
+  const statusChip = camera.status === "active"
+    ? { label: "Cámara activa", className: "camera-status-chip--active" }
+    : camera.status === "requesting"
+      ? { label: "Solicitando permiso…", className: "camera-status-chip--pending" }
+      : camera.status === "error"
+        ? { label: "Cámara no disponible", className: "camera-status-chip--error" }
+        : camera.isSupported
+          ? { label: "Cámara apagada", className: "camera-status-chip--idle" }
+          : { label: "Cámara no disponible", className: "camera-status-chip--idle" };
+
+  let stageTitle = "Activa la vista previa";
+  let stageMessage = "Actívala cuando la persona esté lista para acompañar la conversación con señas.";
+
+  if (!sessionActive) {
+    stageTitle = "Sesión cerrada";
+    stageMessage = "Inicia una nueva atención para volver a usar la cámara.";
+  } else if (camera.status === "requesting") {
+    stageTitle = "Esperando permiso";
+    stageMessage = "Acepta el acceso a la cámara en el navegador para ver la vista previa.";
+  } else if (camera.status === "error") {
+    stageTitle = "No se pudo activar la cámara";
+    stageMessage = camera.error ?? "Puedes reintentar o usar la captura de demostración.";
+  } else if (!camera.isSupported) {
+    stageTitle = "Cámara no disponible";
+    stageMessage = "Este navegador no permite acceder a la cámara. Puedes usar la captura de demostración o escribir la respuesta.";
+  }
+
+  const captureHint = !sessionActive
+    ? "Inicia una nueva atención para capturar."
+    : camera.status === "requesting"
+      ? "Esperando acceso a la cámara."
+      : camera.status === "error"
+        ? "La captura está deshabilitada."
+        : camera.isActive
+          ? "Mantén las manos y el torso visibles."
+          : "La captura se habilita al activar la cámara.";
+
+  const showPrimaryAction = sessionActive && camera.isSupported && camera.status !== "requesting";
+  const showDemoAction = sessionActive && camera.status !== "requesting";
 
   return (
-    <section className="panel-card camera-panel" aria-label="Captura y reconocimiento de señas">
-      <Tabs.Root className="camera-tabs" value={activeTab} onValueChange={setActiveTab}>
-        <Tabs.List className="camera-tabs-list" aria-label="Herramientas de comunicación">
-          <Tabs.Trigger className="camera-tab" value="capture">
-            <Camera size={16} aria-hidden="true" /> Capturar señas
-          </Tabs.Trigger>
-          <Tabs.Trigger className="camera-tab" value="playback">
-            <Play size={15} aria-hidden="true" /> Reproducir respuesta
-          </Tabs.Trigger>
-        </Tabs.List>
-
-        <Tabs.Content className="camera-tab-panel" value="capture">
-          <div className="camera-viewport">
-            <Image
-              className="camera-demo-image"
-              width={880}
-              height={1000}
-              src="/images/camera-signing-demo.png"
-              alt="Imagen ilustrativa de una persona mostrando las manos en un encuadre de práctica"
-              loading="eager"
-            />
-            <span className="camera-status-chip"><span aria-hidden="true" /> Cámara simulada</span>
-            <Button
-              className="camera-settings-button"
-              variant="ghost"
-              size="icon"
-              type="button"
-              aria-label="Opciones de la demostración de cámara"
-              onClick={() => setSettingsOpen(true)}
-            >
-              <Cog size={17} aria-hidden="true" />
-            </Button>
-            <span className="camera-corner camera-corner--tl" aria-hidden="true" />
-            <span className="camera-corner camera-corner--tr" aria-hidden="true" />
-            <span className="camera-corner camera-corner--bl" aria-hidden="true" />
-            <span className="camera-corner camera-corner--br" aria-hidden="true" />
-            {captureStatus === "capturing" || captureStatus === "processing" ? (
-              <span className="camera-processing" role="status">
-                {captureStatus === "capturing" ? "Preparando captura…" : "Procesando demostración…"}
-              </span>
-            ) : null}
+    <section id="camera-capture-panel" className="panel-card camera-panel" aria-label="Captura y reconocimiento de señas">
+      <header className="camera-panel-heading">
+        <div className="camera-panel-title">
+          <span className="camera-panel-icon" aria-hidden="true"><Camera size={17} /></span>
+          <div>
+            <h2>Captura de señas</h2>
+            <p>Cámara y demo LSB</p>
           </div>
-          <div className="camera-controls">
-            <span className="fps-badge"><Camera size={14} aria-hidden="true" /> 30 FPS · demo</span>
-            <Button
-              variant="primary"
-              size="capture"
-              type="button"
-              onClick={() => void startCapture()}
-              disabled={!sessionActive || captureStatus === "capturing" || captureStatus === "processing"}
-              aria-label="Capturar una seña simulada"
-            >
-              <Camera size={22} aria-hidden="true" />
-            </Button>
-            <span className="lsb-badge"><Hand size={15} aria-hidden="true" /> LSB</span>
-          </div>
-          <p className="camera-disclaimer">No se solicita acceso a tu cámara. La imagen y el resultado son de demostración.</p>
-        </Tabs.Content>
-
-        <Tabs.Content className="camera-tab-panel playback-tab-panel" value="playback">
-          <div className="response-preview-image">
-            <Image width={800} height={800} src="/images/avatar-demo.png" alt="Avatar 3D de demostración, sin seña validada" />
-            <span className="demo-label">Vista de demostración</span>
-          </div>
-          <p>La respuesta visual se revisa en el panel de avatar. Esta pestaña no representa una traducción LSB.</p>
-          <Button variant="secondary" onClick={() => setMode("reply")}>
-            <Play size={15} aria-hidden="true" /> Ir a redactar respuesta
-          </Button>
-        </Tabs.Content>
-      </Tabs.Root>
-
-      <div className="recognition-card">
-        <div className="recognition-heading">
-          <div className="inline-title"><Hand size={17} aria-hidden="true" /><h3>Reconocimiento (IA)</h3></div>
-          <span className={`recognition-state ${modelState.className}`}><span aria-hidden="true" />{modelState.label}</span>
         </div>
-        <label className="field-label" htmlFor="recognition-model">Modelo</label>
-        <Select
-          id="recognition-model"
-          label="Modelo de reconocimiento"
-          value={model}
-          options={recognitionModels}
-          onValueChange={setModel}
-          className="select-trigger--full"
-        />
-        <p className="info-callout">
-          <CircleHelp size={15} aria-hidden="true" />
-          El modelo no está conectado. La captura devuelve una frase fija para probar el flujo.
-        </p>
+        <Button
+          className="camera-panel-settings"
+          variant="ghost"
+          size="icon"
+          type="button"
+          aria-label="Ajustes de captura"
+          title="Ajustes de captura"
+          onClick={() => setSettingsOpen(true)}
+        >
+          <Cog size={17} aria-hidden="true" />
+        </Button>
+      </header>
+
+      <div className={`camera-viewport ${camera.stream ? "camera-viewport--live" : ""}`}>
+        {camera.stream ? (
+          <video
+            ref={videoRef}
+            className="camera-video"
+            autoPlay
+            muted
+            playsInline
+            controls={false}
+            disablePictureInPicture
+            aria-label="Vista previa en vivo de la cámara"
+          />
+        ) : (
+          <div
+            className={`camera-stage camera-stage--${sessionActive ? camera.status : "finished"}`}
+            role={sessionActive && camera.status === "error" ? "alert" : undefined}
+          >
+            <div
+              className={`camera-stage-visual ${camera.status === "error" ? "camera-stage-visual--error" : ""}`}
+              aria-hidden="true"
+            >
+              {camera.status === "requesting"
+                ? <LoaderCircle className="camera-spinner" size={30} />
+                : camera.status === "error"
+                  ? <TriangleAlert size={30} />
+                  : sessionActive && camera.isSupported
+                    ? <Hand size={30} />
+                    : <CameraOff size={30} />}
+            </div>
+            <div className="camera-stage-content">
+              <div className="camera-stage-copy">
+                <strong>{stageTitle}</strong>
+                <p>{stageMessage}</p>
+              </div>
+              {sessionActive ? (
+                <div className="camera-stage-actions">
+                  {camera.status === "requesting" ? (
+                    <Button
+                      className="camera-stage-secondary"
+                      variant="ghost"
+                      size="small"
+                      onClick={camera.stop}
+                    >
+                      Cancelar
+                    </Button>
+                  ) : null}
+                  {showPrimaryAction ? (
+                    <Button
+                      id="camera-primary-action"
+                      className="camera-stage-primary"
+                      variant="secondary"
+                      size="small"
+                      onClick={() => void camera.start()}
+                    >
+                      {camera.status === "error"
+                        ? <RotateCcw size={15} aria-hidden="true" />
+                        : <Camera size={15} aria-hidden="true" />}
+                      {camera.status === "error" ? "Reintentar" : "Activar cámara"}
+                    </Button>
+                  ) : null}
+                  {showDemoAction ? (
+                    <Button
+                      className="camera-stage-secondary"
+                      variant="ghost"
+                      size="small"
+                      onClick={handleDemoCapture}
+                      disabled={!canUseDemo}
+                    >
+                      Usar captura de demostración
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        )}
+
+        <span className={`camera-status-chip ${statusChip.className}`} role="status">
+          <span aria-hidden="true" /> {statusChip.label}
+        </span>
+
+        {camera.stream ? (
+          <div className="camera-live-overlay">
+            <span><ShieldCheck size={13} aria-hidden="true" /> Vista local</span>
+            <Button className="camera-live-stop" variant="ghost" size="small" onClick={camera.stop}>
+              <VideoOff size={14} aria-hidden="true" /> Detener cámara
+            </Button>
+          </div>
+        ) : null}
+
+        {captureBusy ? (
+          <span className="camera-processing" role="status">
+            <LoaderCircle className="camera-spinner" size={14} aria-hidden="true" />
+            {captureStatus === "capturing" ? "Preparando captura…" : "Procesando demostración…"}
+          </span>
+        ) : null}
       </div>
+
+      <div className="camera-control-row">
+        <p className="camera-control-hint" id="camera-capture-hint">{captureHint}</p>
+        <div className="camera-shutter-group">
+          <Button
+            id="camera-shutter"
+            variant="primary"
+            size="capture"
+            type="button"
+            onClick={() => void startCapture()}
+            disabled={!canCapture}
+            title={camera.isActive ? undefined : "Activa la cámara para capturar"}
+            aria-label="Capturar una seña con la cámara"
+            aria-describedby="camera-capture-hint"
+            aria-busy={captureBusy}
+          >
+            {captureBusy
+              ? <LoaderCircle className="camera-spinner" size={22} aria-hidden="true" />
+              : <Camera size={22} aria-hidden="true" />}
+          </Button>
+          <span className="camera-shutter-label" aria-hidden="true">
+            {captureBusy ? "Procesando" : "Capturar"}
+          </span>
+        </div>
+        <span className="lsb-badge" title="Lengua de Señas Boliviana">
+          <Hand size={15} aria-hidden="true" /> LSB
+        </span>
+      </div>
+
+      <p className="camera-disclaimer">
+        <ShieldCheck size={14} aria-hidden="true" />
+        Vista previa local, sin grabación. El reconocimiento es una demostración.
+      </p>
 
       <Dialog
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
-        title="Ajustes de captura simulada"
-        description="La cámara real está desactivada en este prototipo."
+        title="Ajustes de captura"
+        description="La cámara se activa solo con una acción explícita y se detiene al finalizar la atención."
       >
+        <div className="camera-settings-block">
+          <label className="field-label" htmlFor="recognition-model">Modelo de reconocimiento</label>
+          <Select
+            id="recognition-model"
+            label="Modelo de reconocimiento"
+            value={model}
+            options={recognitionModels}
+            onValueChange={setModel}
+            className="select-trigger--full"
+          />
+          <p className="help-text">El modelo no está conectado. La captura devuelve una frase fija para probar el flujo.</p>
+        </div>
         <label className="setting-row">
-          <span><strong>Probar un error de reconocimiento</strong><small>La próxima captura mostrará un error que puedes reintentar o cancelar.</small></span>
+          <span><strong>Simular un error en la próxima captura</strong><small>La siguiente captura mostrará un error para probar el reintento.</small></span>
           <input type="checkbox" checked={failNext} onChange={(event) => setFailNext(event.currentTarget.checked)} />
         </label>
-        <p className="help-text">Encuadre sugerido: buena iluminación, manos y torso visibles.</p>
+        <p className="help-text">Encuadre sugerido: buena iluminación, manos y torso visibles. La vista previa no se almacena.</p>
       </Dialog>
     </section>
   );

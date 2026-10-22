@@ -135,7 +135,7 @@ export function ConversationPanel({ onRespond, onUseSigns }: ConversationPanelPr
 
       <footer className="conversation-actions">
         <Button variant="secondary" size="large" onClick={onUseSigns} disabled={!sessionActive}>
-          <CameraActionIcon /> <span><strong>Usar señas</strong><small>Capturar mensaje simulado</small></span>
+          <CameraActionIcon /> <span><strong>Usar señas</strong><small>Activar cámara para capturar</small></span>
         </Button>
         <Button variant="secondary" size="large" onClick={onRespond} disabled={!sessionActive}>
           <Keyboard size={20} aria-hidden="true" /> <span><strong>Responder</strong><small>Escribir o dictar</small></span>
