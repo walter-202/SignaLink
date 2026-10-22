@@ -27,6 +27,14 @@ clips con nombres legibles. El visor conserva el rig y los clips integrados en
 el GLB. Todavía no existe un contrato de glosas ni un conjunto de animaciones
 LSB revisadas.
 
+## Dictado de voz
+
+La vista incluye una entrada experimental de voz a texto en español de Bolivia
+(`es-BO`) mediante Web Speech API. Está disponible solo en navegadores que la
+implementan; si no, se puede escribir en el campo. El navegador puede enviar o
+procesar el audio mediante sus propios servicios. El dictado solo produce texto:
+no traduce a LSB ni selecciona una animación.
+
 ## Referencia externa
 
 El flujo de avatar GLB, reproducción de clips y controles de cámara se estudió

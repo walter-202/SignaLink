@@ -82,6 +82,7 @@ select:focus-visible {
 
 .avatar-viewer,
 .avatar-controls,
+.voice-card,
 .notice-card {
   border: 1px solid var(--border);
   border-radius: 1.25rem;
@@ -127,6 +128,123 @@ select:focus-visible {
   flex-direction: column;
   gap: 1.25rem;
   padding: 1.35rem;
+}
+
+.voice-card {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding: 1.35rem;
+}
+
+.voice-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 1rem;
+}
+
+.voice-heading .eyebrow {
+  margin-bottom: 0.4rem;
+}
+
+.voice-heading h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.voice-heading .help-text {
+  max-width: 31rem;
+}
+
+.text-input {
+  width: 100%;
+  min-height: 6rem;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  background: #fff;
+  color: var(--ink);
+  padding: 0.75rem;
+  line-height: 1.5;
+}
+
+.voice-input {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.voice-actions {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.voice-button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 0.55rem;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  padding: 0.55rem 1rem;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.voice-button:hover {
+  background: var(--accent-dark);
+}
+
+.voice-button.is-listening {
+  border-color: #a8322a;
+  background: #a8322a;
+}
+
+.voice-clear-button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.voice-state {
+  color: #a8322a;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.voice-transcript,
+.voice-support-message {
+  min-height: 3.5rem;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 0.7rem;
+  background: #f8faf9;
+  padding: 0.8rem;
+  color: var(--ink);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.voice-placeholder,
+.voice-interim,
+.voice-support-message {
+  color: var(--muted);
+}
+
+.voice-interim {
+  font-style: italic;
+}
+
+.voice-error {
+  margin: 0;
+  color: #9b3229;
+  font-size: 0.85rem;
 }
 
 .avatar-controls h2 {
@@ -260,6 +378,11 @@ select:disabled {
 
   .avatar-viewer {
     min-height: min(68vh, 560px);
+  }
+
+  .voice-heading {
+    align-items: start;
+    flex-direction: column;
   }
 }
 

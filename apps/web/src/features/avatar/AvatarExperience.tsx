@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
+import { VoiceInputButton } from "@/features/communication";
 import SceneErrorBoundary from "./SceneErrorBoundary";
 
 const AvatarScene = dynamic(() => import("./AvatarScene"), {
@@ -23,6 +24,7 @@ export default function AvatarExperience() {
   const [isLooping, setIsLooping] = useState(true);
   const [speed, setSpeed] = useState(1);
   const [fileError, setFileError] = useState("");
+  const [spokenText, setSpokenText] = useState("");
   const objectUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -193,6 +195,35 @@ export default function AvatarExperience() {
             />
           </div>
         </aside>
+      </section>
+
+      <section className="voice-card" aria-labelledby="voice-title">
+        <div className="voice-heading">
+          <div>
+            <p className="eyebrow">Entrada experimental</p>
+            <h2 id="voice-title">Dictado en español</h2>
+          </div>
+          <p className="help-text">
+            El dictado convierte voz en texto para preparar una futura traducción.
+            Aún no genera señas ni controla las animaciones del avatar.
+          </p>
+        </div>
+        <VoiceInputButton onTranscriptComplete={setSpokenText} />
+        <div className="control-field">
+          <label htmlFor="spoken-text">Texto reconocido</label>
+          <textarea
+            className="text-input"
+            id="spoken-text"
+            rows={4}
+            value={spokenText}
+            onChange={(event) => setSpokenText(event.currentTarget.value)}
+            placeholder="Aquí aparecerá el texto dictado; también puedes escribirlo."
+          />
+        </div>
+        <p className="help-text">
+          El navegador puede procesar el audio mediante sus propios servicios.
+          Revisa sus permisos y privacidad antes de dictar información sensible.
+        </p>
       </section>
 
       <div className="notice-card" role="note">
