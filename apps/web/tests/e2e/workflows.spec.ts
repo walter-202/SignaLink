@@ -1,9 +1,13 @@
 import { expect, test } from "@playwright/test";
 
-test("attention flow reviews a capture, sends a reply, and finalizes the session", async ({ page }) => {
+test("attention flow activates the camera, reviews a capture, sends a reply, and finalizes the session", async ({ page }) => {
   await page.goto("/atender");
 
-  await page.getByRole("button", { name: "Capturar una seña simulada" }).click();
+  await expect(page.getByText("Cámara apagada")).toBeVisible();
+  await page.getByRole("button", { name: "Activar cámara", exact: true }).click();
+  await expect(page.getByText("Cámara activa")).toBeVisible();
+
+  await page.getByRole("button", { name: "Capturar una seña con la cámara" }).click();
   const proposal = page.getByRole("textbox", { name: "Editar propuesta" });
   await expect(proposal).toBeVisible();
   await proposal.fill("Quiero consultar los requisitos.");
@@ -14,10 +18,13 @@ test("attention flow reviews a capture, sends a reply, and finalizes the session
   await page.getByRole("button", { name: "Enviar respuesta" }).click();
   await expect(page.getByRole("button", { name: /Puede revisar los requisitos/ })).toBeVisible();
 
+  await page.getByRole("button", { name: "Detener cámara" }).click();
+  await expect(page.getByText("Cámara apagada")).toBeVisible();
+
   await page.getByRole("button", { name: "Finalizar atención" }).click();
   await page.getByRole("button", { name: "Sí, finalizar" }).click();
   await expect(page.getByText("Atención finalizada")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Capturar una seña simulada" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Capturar una seña con la cámara" })).toBeDisabled();
 });
 
 test("history filters records and confirms before reopening one", async ({ page }) => {
