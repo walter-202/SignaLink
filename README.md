@@ -4,13 +4,15 @@
 
 > Proyecto universitario de ingeniería de software, accesibilidad e inteligencia artificial para facilitar la comunicación bidireccional durante trámites presenciales.
 
-**Estado:** Prototipo técnico inicial; incluye un visor 3D para probar modelos de avatar.
+**Estado:** Prototipo de interfaz funcional con flujos de atención e historial. Usa datos simulados en memoria; todavía no conecta cámara, reconocimiento LSB, persistencia ni servicios institucionales. El avatar es ilustrativo y no traduce señas.
 
 **Nombre anterior:** SignaLink.
 
 **Lengua objetivo del proyecto académico:** Lengua de Señas Boliviana (LSB).
 
 **Arquitectura prevista:** PWA modular, reconocimiento mediante modelos intercambiables e inferencia local cuando sea viable.
+
+La implementación actual está en [`apps/web`](apps/web/README.md). Incluye las vistas `/atender` y `/historial`, revisión manual de capturas simuladas, respuestas de ejemplo y filtros sobre registros ficticios.
 
 ---
 

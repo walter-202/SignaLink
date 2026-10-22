@@ -4,6 +4,9 @@ out/
 dist/
 coverage/
 *.tsbuildinfo
+playwright-report/
+test-results/
+work/
 .env
 .env.*
 !.env.example
