@@ -1,0 +1,273 @@
+:root {
+  color-scheme: light;
+  --ink: #153238;
+  --muted: #52696d;
+  --surface: #ffffff;
+  --canvas: #edf5f3;
+  --accent: #087f73;
+  --accent-dark: #06665d;
+  --border: #d6e3df;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #f6f8f5;
+  color: var(--ink);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid #f0a942;
+  outline-offset: 3px;
+}
+
+.avatar-page {
+  width: min(100% - 2rem, 1180px);
+  margin: 0 auto;
+  padding: clamp(1.5rem, 5vw, 4rem) 0;
+}
+
+.eyebrow {
+  margin: 0 0 0.65rem;
+  color: var(--accent-dark);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.page-heading {
+  max-width: 48rem;
+  margin-bottom: 1.5rem;
+}
+
+.page-heading h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+}
+
+.page-heading p:last-child {
+  max-width: 42rem;
+  margin: 0.9rem 0 0;
+  color: var(--muted);
+  font-size: 1.05rem;
+  line-height: 1.6;
+}
+
+.avatar-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(260px, 0.8fr);
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.avatar-viewer,
+.avatar-controls,
+.notice-card {
+  border: 1px solid var(--border);
+  border-radius: 1.25rem;
+  background: var(--surface);
+  box-shadow: 0 12px 36px rgb(21 50 56 / 7%);
+}
+
+.avatar-viewer {
+  position: relative;
+  min-height: 500px;
+  overflow: hidden;
+  background: var(--canvas);
+}
+
+.avatar-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.viewer-hint {
+  position: absolute;
+  right: 1rem;
+  bottom: 1rem;
+  left: 1rem;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  pointer-events: none;
+  text-align: center;
+}
+
+.scene-state {
+  display: grid;
+  min-height: 100%;
+  place-items: center;
+  padding: 2rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.avatar-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.35rem;
+}
+
+.avatar-controls h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.control-field {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.control-field label,
+.control-label {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.control-field select,
+.file-picker {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  background: #fff;
+  color: var(--ink);
+  padding: 0.6rem 0.7rem;
+}
+
+.file-picker {
+  padding: 0.45rem;
+}
+
+.help-text,
+.model-name,
+.status-message {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.model-name {
+  overflow-wrap: anywhere;
+}
+
+.status-message[role="alert"] {
+  color: #9b3229;
+}
+
+.control-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.primary-button,
+.secondary-button {
+  min-height: 44px;
+  border: 1px solid var(--accent);
+  border-radius: 0.7rem;
+  cursor: pointer;
+  font-weight: 700;
+  transition: background 140ms ease, color 140ms ease, transform 140ms ease;
+}
+
+.primary-button {
+  background: var(--accent);
+  color: white;
+}
+
+.primary-button:hover:not(:disabled) {
+  background: var(--accent-dark);
+}
+
+.secondary-button {
+  background: white;
+  color: var(--accent-dark);
+}
+
+.secondary-button:hover:not(:disabled) {
+  background: #e8f4f1;
+}
+
+.primary-button:active:not(:disabled),
+.secondary-button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+button:disabled,
+select:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.range-control {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+
+.toggle-row input {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--accent);
+}
+
+.notice-card {
+  margin-top: 1rem;
+  padding: 1rem 1.2rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.notice-card strong {
+  color: var(--ink);
+}
+
+@media (max-width: 760px) {
+  .avatar-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .avatar-viewer {
+    min-height: min(68vh, 560px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "la-voz-de-tus-manos",
+  "private": true,
+  "packageManager": "pnpm@11.25.0",
+  "engines": {
+    "node": ">=20.9"
+  },
+  "scripts": {
+    "dev:web": "pnpm --filter @la-voz/web dev",
+    "build:web": "pnpm --filter @la-voz/web build",
+    "lint:web": "pnpm --filter @la-voz/web lint"
+  }
+}

@@ -4,7 +4,7 @@
 
 > Proyecto universitario de ingeniería de software, accesibilidad e inteligencia artificial para facilitar la comunicación bidireccional durante trámites presenciales.
 
-**Estado:** Análisis, investigación y preparación arquitectónica.
+**Estado:** Prototipo técnico inicial; incluye un visor 3D para probar modelos de avatar.
 
 **Nombre anterior:** SignaLink.
 
@@ -64,6 +64,7 @@ Este objetivo constituye una formulación preliminar, pendiente de consolidació
 - Dictado de voz cuando exista soporte compatible.
 - Selección de respuestas conocidas con equivalencia LSB validada.
 - Reproducción de videos LSB.
+- Visor experimental para probar modelos 3D y sus clips de animación.
 - Estados de error y alternativas accesibles.
 - Finalización de sesiones y descarte de datos temporales.
 - Interfaz mobile-first.
@@ -74,7 +75,7 @@ Este objetivo constituye una formulación preliminar, pendiente de consolidació
 - Adaptación automática de modelos a partir de conversaciones.
 - Reconocimiento universal de señas.
 - Traducción libre de conversaciones continuas.
-- Generación automática de LSB mediante avatares.
+- Generación automática de señas LSB mediante avatares; el visor 3D actual no valida ni traduce señas.
 - Integraciones institucionales.
 - Administración avanzada de trámites.
 - Traducción ilimitada entre múltiples lenguas de señas.
