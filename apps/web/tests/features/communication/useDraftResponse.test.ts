@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useDraftResponse } from '../useDraftResponse';
-import { DEFAULT_QUICK_PHRASES } from '../quickPhrases.data';
-import { SpeechRecognitionDriver } from '../speechDriver';
+import { useDraftResponse } from '@/features/communication/useDraftResponse';
+import { DEFAULT_QUICK_PHRASES } from '@/features/communication/quickPhrases.data';
+import { SpeechRecognitionDriver } from '@/features/communication/speechDriver';
 
 class MockSpeechDriver implements SpeechRecognitionDriver {
   isSupported = true;

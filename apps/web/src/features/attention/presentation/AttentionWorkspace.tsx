@@ -9,6 +9,7 @@ import { StatusIndicator } from "@/components/feedback/StatusIndicator";
 import { useAttentionStore } from "@/features/attention/application/attention-store";
 import { useCamera } from "@/features/camera";
 import { formatProcedureDateTime } from "@/features/procedure-history/application/filter-history";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { AvatarPreview } from "./components/AvatarPreview";
 import { CameraPanel } from "./components/CameraPanel";
 import { ConversationPanel } from "./components/ConversationPanel";
@@ -37,10 +38,17 @@ export function AttentionWorkspace() {
   const setMode = useAttentionStore((state) => state.setMode);
   const finishAttention = useAttentionStore((state) => state.finishAttention);
   const startNewAttention = useAttentionStore((state) => state.startNewAttention);
+  const loadHistory = useAttentionStore((state) => state.loadHistory);
+  const isConfigured = isSupabaseConfigured();
+
   const record = records.find((item) => item.id === activeRecordId) ?? records[0];
   const sessionActive = record?.status === "active";
   const camera = useCamera();
   const stopCamera = camera.stop;
+
+  useEffect(() => {
+    void loadHistory();
+  }, [loadHistory]);
 
   useEffect(() => {
     stopCamera();
@@ -66,13 +74,13 @@ export function AttentionWorkspace() {
   function confirmFinish() {
     finishAttention();
     setConfirmFinishOpen(false);
-    setToast("La atención de demostración se marcó como finalizada.");
+    setToast(isConfigured ? "La atención se guardó y marcó como finalizada en Supabase." : "La atención se marcó como finalizada.");
     window.setTimeout(() => setToast(""), 4_000);
   }
 
   function handleNewAttention() {
     startNewAttention();
-    setToast("Nueva atención de demostración iniciada.");
+    setToast(isConfigured ? "Nueva atención iniciada y registrada en Supabase." : "Nueva atención iniciada.");
     window.setTimeout(() => setToast(""), 4_000);
   }
 
@@ -126,6 +134,7 @@ export function AttentionWorkspace() {
               <button className="subtle-icon-button" type="button" aria-label="Información del trámite" title="Información del trámite" onClick={() => setProcedureInfoOpen(true)}><Info size={15} aria-hidden="true" /></button>
             </header>
             <dl className="procedure-facts">
+              <div><dt>ID / Referencia</dt><dd style={{ fontSize: "0.75rem", wordBreak: "break-all" }}>{record?.id ?? "—"}</dd></div>
               <div><dt>Tipo</dt><dd>{record?.procedureType ?? procedureType}</dd></div>
               <div><dt>Estado</dt><dd>{record ? <StatusIndicator status={record.status} /> : "—"}</dd></div>
               <div><dt>Inicio</dt><dd>{record ? formatProcedureDateTime(record.startedAt) : "—"}</dd></div>
@@ -133,7 +142,14 @@ export function AttentionWorkspace() {
             </dl>
           </section>
           <section className="panel-card notes-card" aria-labelledby="notes-title">
-            <header className="compact-card-heading"><h2 id="notes-title">Observaciones</h2><span className="notes-local-badge">Solo en sesión</span></header>
+            <header className="compact-card-heading">
+              <h2 id="notes-title">Observaciones</h2>
+              {isConfigured ? (
+                <span className="notes-local-badge" style={{ background: "#ecfdf5", color: "#065f46" }}>Guardado en Supabase</span>
+              ) : (
+                <span className="notes-local-badge">Solo en sesión</span>
+              )}
+            </header>
             <label className="sr-only" htmlFor="procedure-notes">Observaciones internas</label>
             <textarea
               id="procedure-notes"
@@ -145,7 +161,11 @@ export function AttentionWorkspace() {
               aria-describedby={notesError ? "notes-error" : "notes-counter"}
             />
             <div className="composer-count-row">
-              {notesError ? <span className="field-error" id="notes-error" role="alert">{notesError}</span> : <span className="help-text">No se guarda fuera de esta sesión.</span>}
+              {notesError ? (
+                <span className="field-error" id="notes-error" role="alert">{notesError}</span>
+              ) : (
+                <span className="help-text">{isConfigured ? "Sincronizado con Supabase." : "No se guarda fuera de esta sesión."}</span>
+              )}
               <span className="character-count" id="notes-counter">{notes.length} / 300</span>
             </div>
           </section>
@@ -159,16 +179,16 @@ export function AttentionWorkspace() {
         open={procedureInfoOpen}
         onOpenChange={setProcedureInfoOpen}
         title="Datos del trámite"
-        description="El tipo se elige manualmente para organizar esta atención de demostración."
+        description="Gestión y registro del trámite con persistencia en Supabase."
       >
-        <p>Los datos del trámite y las observaciones no se envían a una institución ni se guardan fuera de la sesión actual.</p>
+        <p>Los datos del trámite y las observaciones se registran en Supabase para el historial de atención ciudadana.</p>
       </Dialog>
 
       <Dialog
         open={confirmFinishOpen}
         onOpenChange={setConfirmFinishOpen}
         title="¿Finalizar esta atención?"
-        description="La atención se marcará como finalizada en los datos de demostración de esta sesión."
+        description={isConfigured ? "La atención se marcará como finalizada y se guardará en Supabase." : "La atención se marcará como finalizada en los datos de demostración de esta sesión."}
         footer={(
           <>
             <Button variant="secondary" onClick={() => setConfirmFinishOpen(false)}>Seguir atendiendo</Button>

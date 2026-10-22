@@ -35,7 +35,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const [highContrast, setHighContrast] = useState(false);
   const records = useAttentionStore((state) => state.records);
   const activeRecordId = useAttentionStore((state) => state.activeRecordId);
+  const loadHistory = useAttentionStore((state) => state.loadHistory);
   const activeRecord = records.find((record) => record.id === activeRecordId);
+
+  useEffect(() => {
+    void loadHistory();
+  }, [loadHistory]);
 
   useEffect(() => {
     const updateClock = () => setClock(new Intl.DateTimeFormat("es-BO", {

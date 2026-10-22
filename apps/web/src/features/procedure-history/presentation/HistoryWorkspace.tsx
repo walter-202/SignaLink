@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { History } from "lucide-react";
+import { CheckCircle2, History } from "lucide-react";
 import { useAttentionStore } from "@/features/attention/application/attention-store";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { filterHistory, type HistoryFilters as HistoryFiltersType } from "../application/filter-history";
 import type { HistoryRecord } from "../domain/types";
 import { HistoryDetailPanel } from "./components/HistoryDetailPanel";
@@ -16,6 +17,13 @@ export function HistoryWorkspace() {
   const router = useRouter();
   const records = useAttentionStore((state) => state.records);
   const reopenAttention = useAttentionStore((state) => state.reopenAttention);
+  const loadHistory = useAttentionStore((state) => state.loadHistory);
+  const isConfigured = isSupabaseConfigured();
+
+  useEffect(() => {
+    void loadHistory();
+  }, [loadHistory]);
+
   const [filters, setFilters] = useState<HistoryFiltersType>({
     query: "",
     status: "all",
@@ -51,11 +59,19 @@ export function HistoryWorkspace() {
     <div className="workspace-page history-page">
       <header className="page-heading">
         <div>
-          <p className="eyebrow">Consultas de la sesión de demostración</p>
+          <p className="eyebrow">Consultas y registro histórico de atenciones</p>
           <h1>Historial de trámites</h1>
-          <p>Consulta y revisa las atenciones realizadas.</p>
+          <p>Consulta y revisa las atenciones realizadas con persistencia en Supabase.</p>
         </div>
-        <span className="history-demo-note"><History size={15} aria-hidden="true" /> Datos ficticios · no persistentes</span>
+        {isConfigured ? (
+          <span className="history-demo-note" style={{ borderColor: "#10b981", color: "#065f46" }}>
+            <CheckCircle2 size={15} aria-hidden="true" color="#059669" /> Supabase conectado · Persistencia activa
+          </span>
+        ) : (
+          <span className="history-demo-note">
+            <History size={15} aria-hidden="true" /> Datos de demostración
+          </span>
+        )}
       </header>
 
       <HistoryFilters filters={filters} onChange={changeFilters} onClear={clearFilters} />

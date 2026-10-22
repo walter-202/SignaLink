@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { MOCK_HISTORY, MOCK_HISTORY_ANCHOR } from "@/features/procedure-history/mocks/history.mock";
 import type { ConversationMessage, HistoryRecord } from "@/features/procedure-history/domain/types";
+import { procedureRepository } from "@/lib/supabase/procedure-repository";
 import { recognizeMockSign } from "./mock-recognition-service";
 import { procedureNotesSchema, replyTextSchema } from "./validation";
 
@@ -23,6 +24,8 @@ interface AttentionState {
   notesError: string | null;
   mode: ConversationMode;
   messages: ConversationMessage[];
+  isLoadingHistory: boolean;
+  loadHistory: () => Promise<void>;
   startCapture: () => Promise<void>;
   cancelCapture: () => void;
   confirmCapture: () => void;
@@ -38,6 +41,21 @@ interface AttentionState {
   finishAttention: () => void;
   startNewAttention: () => void;
   reopenAttention: (recordId: string) => void;
+}
+
+function isUuid(str: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+}
+
+function generateUuid(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
 }
 
 const initialRecord = MOCK_HISTORY.find((record) => record.status === "active") ?? MOCK_HISTORY[0];
@@ -65,13 +83,42 @@ function createMessage(
   source: ConversationMessage["source"],
 ): ConversationMessage {
   return {
-    id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    id: generateUuid(),
     sender,
     text,
     time: formatTime(),
     state: sender === "citizen" ? "confirmed" : "sent",
     source,
   };
+}
+
+function ensureProcedurePersisted(
+  state: AttentionState,
+  set: (fn: (current: AttentionState) => Partial<AttentionState>) => void,
+): string {
+  const currentId = state.activeRecordId;
+  if (isUuid(currentId)) {
+    return currentId;
+  }
+
+  const newUuid = generateUuid();
+  const currentRecord = state.records.find((r) => r.id === currentId);
+  const procedureType = currentRecord?.procedureType ?? state.procedureType ?? "Registro ciudadano";
+  const notes = currentRecord?.notes ?? state.notes ?? "";
+
+  set((prev) => ({
+    activeRecordId: newUuid,
+    records: prev.records.map((r) => r.id === currentId ? { ...r, id: newUuid } : r),
+  }));
+
+  void procedureRepository.createProcedure({
+    id: newUuid,
+    procedureType,
+    status: "active",
+    notes,
+  });
+
+  return newUuid;
 }
 
 export const useAttentionStore = create<AttentionState>((set, get) => ({
@@ -88,6 +135,48 @@ export const useAttentionStore = create<AttentionState>((set, get) => ({
   notesError: null,
   mode: "capture",
   messages: initialRecord.messages,
+  isLoadingHistory: false,
+
+  loadHistory: async () => {
+    if (get().isLoadingHistory) return;
+    set({ isLoadingHistory: true });
+    try {
+      const history = await procedureRepository.getHistory();
+      set((current) => {
+        const activeRecord = current.records.find((r) => r.id === current.activeRecordId);
+        const historyIds = new Set(history.map((r) => r.id));
+        let mergedRecords = history;
+        if (activeRecord && !historyIds.has(activeRecord.id)) {
+          mergedRecords = [activeRecord, ...history];
+        }
+
+        const activeInHistory = history.find((r) => r.status === "active");
+        let activeRecordId = current.activeRecordId;
+        let messages = current.messages;
+        let notes = current.notes;
+        let procedureType = current.procedureType;
+
+        if (!isUuid(activeRecordId) && activeInHistory) {
+          activeRecordId = activeInHistory.id;
+          messages = activeInHistory.messages;
+          notes = activeInHistory.notes;
+          procedureType = activeInHistory.procedureType;
+        }
+
+        return {
+          records: mergedRecords,
+          activeRecordId,
+          messages,
+          notes,
+          procedureType,
+          isLoadingHistory: false,
+        };
+      });
+    } catch (err) {
+      console.warn("No se pudo cargar el historial desde Supabase:", err);
+      set({ isLoadingHistory: false });
+    }
+  },
 
   startCapture: async () => {
     const activeRecord = get().records.find((record) => record.id === get().activeRecordId);
@@ -132,15 +221,19 @@ export const useAttentionStore = create<AttentionState>((set, get) => ({
     if (state.captureStatus !== "reviewing" || !state.captureText.trim()) return;
     const message = createMessage("citizen", state.captureText.trim(), "reviewed-sign");
     const messages = [...state.messages, message];
+    const procedureId = ensureProcedurePersisted(state, set);
+
     set((current) => ({
       messages,
       captureStatus: "confirmed",
       captureError: null,
-      records: replaceRecord(current.records, current.activeRecordId, (record) => ({
+      records: replaceRecord(current.records, procedureId, (record) => ({
         ...record,
         messages,
       })),
     }));
+
+    void procedureRepository.appendMessage(procedureId, message);
   },
 
   setCaptureText: (captureText) => set({ captureText }),
@@ -162,17 +255,22 @@ export const useAttentionStore = create<AttentionState>((set, get) => ({
       set({ draftError: result.error.issues[0]?.message ?? "Revisa el texto antes de continuar." });
       return false;
     }
-    const messages = [...state.messages, createMessage("staff", result.data, source)];
+    const message = createMessage("staff", result.data, source);
+    const messages = [...state.messages, message];
+    const procedureId = ensureProcedurePersisted(state, set);
+
     set((current) => ({
       messages,
       draft: "",
       draftError: null,
-      records: replaceRecord(current.records, current.activeRecordId, (record) => ({
+      records: replaceRecord(current.records, procedureId, (record) => ({
         ...record,
         messages,
       })),
       mode: "capture",
     }));
+
+    void procedureRepository.appendMessage(procedureId, message);
     return true;
   },
 
@@ -182,48 +280,62 @@ export const useAttentionStore = create<AttentionState>((set, get) => ({
       set({ notes, notesError: result.error.issues[0]?.message ?? "Revisa las observaciones." });
       return;
     }
+    const currentId = get().activeRecordId;
     set((state) => ({
       notes,
       notesError: null,
-      records: replaceRecord(state.records, state.activeRecordId, (record) => ({ ...record, notes })),
+      records: replaceRecord(state.records, currentId, (record) => ({ ...record, notes })),
     }));
+    if (isUuid(currentId)) {
+      void procedureRepository.updateProcedureNotes(currentId, notes);
+    }
   },
 
   setMode: (mode) => set({ mode }),
 
-  setProcedureType: (procedureType) => set((state) => ({
-    procedureType,
-    records: replaceRecord(state.records, state.activeRecordId, (record) => ({
-      ...record,
+  setProcedureType: (procedureType) => {
+    const currentId = get().activeRecordId;
+    set((state) => ({
       procedureType,
-    })),
-  })),
+      records: replaceRecord(state.records, currentId, (record) => ({
+        ...record,
+        procedureType,
+      })),
+    }));
+    if (isUuid(currentId)) {
+      void procedureRepository.updateProcedureType(currentId, procedureType);
+    }
+  },
 
   finishAttention: () => {
     captureAttempt += 1;
-    set((state) => ({
-      records: replaceRecord(state.records, state.activeRecordId, (record) => ({
+    const state = get();
+    const procedureId = ensureProcedurePersisted(state, set);
+    const notes = state.notes;
+    const currentRecord = state.records.find((r) => r.id === procedureId);
+    const durationMinutes = Math.max(currentRecord?.durationMinutes ?? 0, 12);
+
+    set((current) => ({
+      records: replaceRecord(current.records, procedureId, (record) => ({
         ...record,
         status: "completed",
-        durationMinutes: Math.max(record.durationMinutes, 12),
-        notes: state.notes,
+        durationMinutes,
+        notes,
       })),
       captureStatus: "idle",
       captureText: "",
       captureError: null,
     }));
+
+    void procedureRepository.completeProcedure(procedureId, notes, durationMinutes);
   },
 
   startNewAttention: () => {
-    const state = get();
-    const nextNumber = state.records.reduce((max, record) => {
-      const match = record.id.match(/(\d+)$/);
-      return Math.max(max, match ? Number(match[1]) : 0);
-    }, 0) + 1;
+    const newId = generateUuid();
     const record: HistoryRecord = {
-      id: `AT-DEMO-${String(nextNumber).padStart(4, "0")}`,
+      id: newId,
       procedureType: "Registro ciudadano",
-      startedAt: new Date(MOCK_HISTORY_ANCHOR.getTime() - 60_000).toISOString(),
+      startedAt: new Date().toISOString(),
       status: "active",
       durationMinutes: 0,
       messages: [],
@@ -231,7 +343,7 @@ export const useAttentionStore = create<AttentionState>((set, get) => ({
     };
     captureAttempt += 1;
     set((current) => ({
-      records: [record, ...current.records],
+      records: [record, ...current.records.filter((r) => r.id !== newId)],
       activeRecordId: record.id,
       procedureType: record.procedureType,
       captureStatus: "idle",
@@ -244,6 +356,12 @@ export const useAttentionStore = create<AttentionState>((set, get) => ({
       messages: [],
       mode: "capture",
     }));
+
+    void procedureRepository.createProcedure({
+      id: newId,
+      procedureType: record.procedureType,
+      status: "active",
+    });
   },
 
   reopenAttention: (recordId) => {
@@ -260,6 +378,9 @@ export const useAttentionStore = create<AttentionState>((set, get) => ({
       captureText: "",
       captureError: null,
     }));
+    if (isUuid(recordId)) {
+      void procedureRepository.reopenProcedure(recordId);
+    }
   },
 }));
 
