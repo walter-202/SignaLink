@@ -10,8 +10,7 @@ import type { LandmarkFrame, LandmarkPoint } from "../domain/landmarks";
 
 const configuredWasmPath = process.env.NEXT_PUBLIC_MEDIAPIPE_WASM_PATH?.trim();
 const configuredModelUrl = process.env.NEXT_PUBLIC_MEDIAPIPE_HOLISTIC_MODEL_URL?.trim();
-const DEFAULT_WASM_PATH = configuredWasmPath
-  || "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.1/wasm";
+const DEFAULT_WASM_PATH = configuredWasmPath || "/mediapipe/wasm";
 const DEFAULT_MODEL_URL = configuredModelUrl
   || "https://storage.googleapis.com/mediapipe-models/holistic_landmarker/holistic_landmarker/float16/latest/holistic_landmarker.task";
 

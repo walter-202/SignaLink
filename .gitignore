@@ -10,3 +10,4 @@ work/
 .env
 .env.*
 !.env.example
+/apps/web/public/mediapipe/wasm/

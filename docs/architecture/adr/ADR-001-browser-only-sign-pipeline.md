@@ -113,7 +113,7 @@ No bloquea el prototipo. Primero se valida el contrato de landmarks y el adaptad
 - El modelo de referencia cubre 58 clases y condiciones de captura limitadas; no representa LSB general ni traducción libre.
 - La paridad entre MediaPipe Python y MediaPipe Web debe verificarse con fixtures antes de confiar en las predicciones.
 - El procesamiento en el hilo principal puede afectar la UI; se debe medir y migrar a worker si es necesario.
-- La carga desde CDN para WASM/modelo es aceptable para el prototipo, pero producción debe usar artefactos versionados y almacenamiento aprobado.
+- El WASM se copia desde la versión fijada del paquete y se sirve desde el mismo origen. El modelo Holistic `.task` aún usa Google Storage por defecto; antes del piloto se debe alojar en una ubicación propia aprobada y versionada.
 
 ## Fases
 

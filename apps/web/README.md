@@ -30,7 +30,7 @@ Las imágenes del avatar son recursos generados para la interfaz de demostració
 
 La feature `sign-recognition` carga MediaPipe Holistic bajo demanda, procesa la vista previa en el navegador y dibuja pose y manos sobre un canvas. No envía video, frames ni landmarks a Supabase ni a un endpoint propio. La detección se puede desactivar desde ajustes o con `NEXT_PUBLIC_SIGN_LANDMARKS=off`; los tests E2E la desactivan para evitar descargar el modelo.
 
-Los artefactos se descargan de CDN por defecto. Para desarrollo reproducible o producción se pueden fijar `NEXT_PUBLIC_MEDIAPIPE_WASM_PATH` y `NEXT_PUBLIC_MEDIAPIPE_HOLISTIC_MODEL_URL` a copias versionadas. Las variables están documentadas en `.env.example`. El clasificador ONNX y las etiquetas LSB todavía no están integrados; por ahora solo se generan landmarks y un vector de 30 × 138 características.
+El paquete fijado `@mediapipe/tasks-vision@1.1.1` incluye los binarios WASM. Antes de iniciar desarrollo o producción, `scripts/copy-mediapipe-wasm.mjs` copia las variantes SIMD y no-SIMD a `public/mediapipe/wasm`; la app las sirve desde su propio origen, sin depender de jsDelivr. El archivo del modelo Holistic `.task` no viene dentro del paquete y todavía se descarga desde Google Storage por defecto; su URL usa `latest`, así que habrá que copiarlo a un recurso propio y fijar su versión/hash antes del piloto. `NEXT_PUBLIC_MEDIAPIPE_WASM_PATH` y `NEXT_PUBLIC_MEDIAPIPE_HOLISTIC_MODEL_URL` permiten fijar rutas propias para ambos recursos. La extracción actual genera 138 características por fotograma; todavía falta acumular la secuencia temporal de 30 fotogramas y conectarla a un clasificador ONNX con etiquetas LSB.
 
 La decisión y sus límites están documentados en el [ADR-001](../../docs/architecture/adr/ADR-001-browser-only-sign-pipeline.md) y la investigación en [browser-sign-recognition.md](../../docs/research/browser-sign-recognition.md).
 
@@ -47,7 +47,7 @@ src/
     camera/                    # Puerto y adaptador de getUserMedia
     communication/             # Puerto de voz, adaptador de navegador y controles
     procedure-history/          # Dominio, fixtures, filtros y vista de historial
-    sign-recognition/          # MediaPipe, features 30 × 138 y overlay local
+    sign-recognition/          # MediaPipe, features por fotograma y overlay local
 tests/
   e2e/                         # Flujos de navegador con Playwright
 ```

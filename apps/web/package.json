@@ -3,9 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --webpack",
-    "dev:turbo": "next dev",
-    "build": "next build",
+    "copy:mediapipe-wasm": "node scripts/copy-mediapipe-wasm.mjs",
+    "dev": "pnpm copy:mediapipe-wasm && next dev --webpack",
+    "dev:turbo": "pnpm copy:mediapipe-wasm && next dev",
+    "build": "pnpm copy:mediapipe-wasm && next build",
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run",

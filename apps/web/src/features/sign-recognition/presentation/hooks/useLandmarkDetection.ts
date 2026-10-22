@@ -29,13 +29,13 @@ export interface UseLandmarkDetectionReturn {
 function getLandmarkErrorMessage(code: LandmarkDetectorErrorCode): string {
   switch (code) {
     case "not-supported":
-      return "Este navegador no puede cargar los landmarks locales. Puedes continuar con la captura de demostraciÃ³n.";
+      return "Este navegador no puede cargar los landmarks locales. Puedes continuar con la captura de demostración.";
     case "model-load":
-      return "No se pudieron cargar los landmarks. Revisa la conexiÃ³n o continÃºa con la captura de demostraciÃ³n.";
+      return "No se pudieron cargar los landmarks. Revisa la conexión o continúa con la captura de demostración.";
     case "inference":
-      return "La detecciÃ³n de landmarks se detuvo. DetÃ©n la cÃ¡mara y vuelve a intentarlo.";
+      return "La detección de landmarks se detuvo. Detén la cámara y vuelve a intentarlo.";
     case "closed":
-      return "La detecciÃ³n de landmarks se cerrÃ³.";
+      return "La detección de landmarks se cerró.";
   }
 }
 
