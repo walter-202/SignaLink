@@ -27,7 +27,10 @@ export function Dialog({
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="dialog-overlay" />
-        <DialogPrimitive.Content className={`dialog-content ${className}`}>
+        <DialogPrimitive.Content
+          className={"dialog-content " + className}
+          aria-modal="true"
+        >
           <div className="dialog-heading">
             <div>
               <DialogPrimitive.Title className="dialog-title">{title}</DialogPrimitive.Title>

@@ -67,6 +67,7 @@ export function AttentionWorkspace() {
   const startNewAttention = useAttentionStore((state) => state.startNewAttention);
   const record = records.find((item) => item.id === activeRecordId) ?? records[0];
   const sessionActive = record?.status === "active";
+  const autoStartAvatar = Boolean(sessionActive && draftExpression?.animationClipId);
   const camera = useCamera();
   const stopCamera = camera.stop;
 
@@ -189,17 +190,21 @@ export function AttentionWorkspace() {
         </div>
         <aside className="attention-column attention-column--response" aria-label="Respuesta y datos del trámite">
           <ResponseComposer textareaRef={responseRef} />
-          <LsbExpressionPanel
-            draft={draft}
-            availableModelClips={availableModelClips}
-            onResolved={handleLsbResolution}
-          />
-          <AvatarPreview
-            expression={lsbExpression}
-            autoStart={Boolean(draftExpression?.animationClipId)}
-            onClipsLoaded={handleAvatarClipsLoaded}
-          />
-          <section className="panel-card procedure-info-card" aria-labelledby="procedure-info-title">
+          <div className="attention-support-grid">
+            <LsbExpressionPanel
+              draft={draft}
+              availableModelClips={availableModelClips}
+              onResolved={handleLsbResolution}
+            />
+            <AvatarPreview
+              expression={lsbExpression}
+              isDraftMatch={Boolean(draftExpression)}
+              autoStart={autoStartAvatar}
+              onClipsLoaded={handleAvatarClipsLoaded}
+            />
+          </div>
+          <div className="attention-session-grid">
+            <section className="panel-card procedure-info-card" aria-labelledby="procedure-info-title">
             <header className="compact-card-heading">
               <div className="inline-title"><ShieldCheck size={17} aria-hidden="true" /><h2 id="procedure-info-title">Datos del trámite</h2></div>
               <button className="subtle-icon-button" type="button" aria-label="Información del trámite" title="Información del trámite" onClick={() => setProcedureInfoOpen(true)}><Info size={15} aria-hidden="true" /></button>
@@ -210,8 +215,8 @@ export function AttentionWorkspace() {
               <div><dt>Inicio</dt><dd>{record ? formatProcedureDateTime(record.startedAt) : "—"}</dd></div>
               <div><dt>Duración</dt><dd>{record?.durationMinutes ?? 0} min</dd></div>
             </dl>
-          </section>
-          <section className="panel-card notes-card" aria-labelledby="notes-title">
+            </section>
+            <section className="panel-card notes-card" aria-labelledby="notes-title">
             <header className="compact-card-heading"><h2 id="notes-title">Observaciones</h2><span className="notes-local-badge">{notesDirty ? "Pendiente de guardar" : "Guardado"}</span></header>
             <label className="sr-only" htmlFor="procedure-notes">Observaciones internas</label>
             <textarea
@@ -228,7 +233,8 @@ export function AttentionWorkspace() {
               {notesError ? <span className="field-error" id="notes-error" role="alert">{notesError}</span> : <span className="help-text">Se guarda al salir del campo.</span>}
               <span className="character-count" id="notes-counter">{notes.length} / 300</span>
             </div>
-          </section>
+            </section>
+          </div>
         </aside>
       </div>
 

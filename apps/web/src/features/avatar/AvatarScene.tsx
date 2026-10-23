@@ -40,8 +40,8 @@ export default function AvatarScene(props: AvatarSceneProps) {
     <Canvas
       className="avatar-canvas"
       dpr={[1, 1.5]}
-      camera={{ position: [0, 1.55, 4.8], fov: 34, near: 0.1, far: 50 }}
-      onCreated={({ camera }) => camera.lookAt(0, 1.25, 0)}
+      camera={{ position: [0, 1.45, 3.3], fov: 18, near: 0.1, far: 50 }}
+      onCreated={({ camera }) => camera.lookAt(0, 1.45, 0)}
       gl={{ antialias: true, alpha: true, powerPreference: "low-power" }}
       fallback={
         <p className="scene-state">
@@ -83,7 +83,6 @@ export default function AvatarScene(props: AvatarSceneProps) {
           <ProvisionalAvatar />
         )}
       </Suspense>
-
     </Canvas>
   );
 }

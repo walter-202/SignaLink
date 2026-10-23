@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LsbExpression } from "@/features/lsb-catalog/domain/lsb-expression";
@@ -89,7 +89,7 @@ describe("AvatarPreview", () => {
     await renderPreview(expression());
     await userEvent.click(
       screen.getByRole("button", {
-        name: "Cargar modelo y buscar clip «Hola»",
+        name: "Abrir escena 3D",
       }),
     );
     await screen.findByTestId("scene");
@@ -100,21 +100,20 @@ describe("AvatarPreview", () => {
       ),
     );
     expect(screen.getByTestId("scene")).toHaveAttribute("data-playing", "true");
-    expect(screen.getByText(/Clip «Armature\|HOLA» listo/)).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("dialog")).getByText(/Clip «Armature\|HOLA» listo/),
+    ).toBeInTheDocument();
     expect(screen.getByText("0:00 / 0:02")).toBeInTheDocument();
   });
 
   it("keeps the bundled avatar unloaded until the user requests it", async () => {
     await renderPreview(expression());
     expect(screen.queryByTestId("scene")).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("img", {
-        name: /avatar de demostración; esta imagen no representa/i,
-      }),
-    ).toHaveAttribute("loading", "eager");
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
     await userEvent.click(
-      screen.getByRole("button", { name: "Ver «Hola» en 3D · 20.5 MB" }),
+      screen.getByRole("button", { name: "Abrir escena 3D" }),
     );
+    await screen.findByRole("dialog", { name: "Vista 3D de respuesta" });
     await screen.findByTestId("scene");
     await waitFor(() =>
       expect(screen.getByTestId("scene")).toHaveAttribute(
@@ -123,9 +122,7 @@ describe("AvatarPreview", () => {
       ),
     );
     expect(screen.getByTestId("scene")).toHaveAttribute("data-playing", "true");
-    expect(
-      screen.getByText(/Modelo:\s*Avatar demostrativo/),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Modelo: Avatar demostrativo")).toBeInTheDocument();
   });
 
   it("automatically loads the exact catalog clip when requested by the response", async () => {
@@ -139,7 +136,9 @@ describe("AvatarPreview", () => {
       );
       expect(screen.getByTestId("scene")).toHaveAttribute("data-playing", "true");
     });
-    expect(screen.getByText("Vista 3D de respuesta")).toBeInTheDocument();
+    expect(
+      screen.getByRole("dialog", { name: "Vista 3D de respuesta" }),
+    ).toBeInTheDocument();
   });
 
   it("formats durations longer than a minute as minutes and seconds", async () => {
@@ -153,7 +152,7 @@ describe("AvatarPreview", () => {
       await renderPreview(expression());
       await userEvent.click(
         screen.getByRole("button", {
-          name: "Cargar modelo y buscar clip «Hola»",
+          name: "Abrir escena 3D",
         }),
       );
       await screen.findByTestId("scene");
@@ -165,17 +164,40 @@ describe("AvatarPreview", () => {
     }
   });
 
-  it("keeps the provisional figure when the bundled avatar is disabled", async () => {
+  it("shows no reference image when the bundled avatar is disabled", async () => {
     vi.stubEnv("NEXT_PUBLIC_LSB_AVATAR_MODEL_URL", "off");
     await renderPreview(expression());
     expect(screen.queryByTestId("scene")).not.toBeInTheDocument();
-    expect(screen.getByRole("img", { name: /avatar de demostración/i })).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Reproducir animación LSB" }),
-    ).toBeDisabled();
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
     expect(
       screen.getByText("El avatar 3D está desactivado en esta instalación."),
     ).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Abrir escena 3D" }),
+    );
+    expect(
+      await screen.findByRole("button", { name: "Reproducir animación LSB" }),
+    ).toBeDisabled();
+  });
+
+  it("opens and plays the exact supported response automatically", async () => {
+    vi.stubEnv(
+      "NEXT_PUBLIC_LSB_AVATAR_MODEL_URL",
+      "https://example.com/avatar.glb",
+    );
+    await renderPreview(expression(), true);
+    const dialog = await screen.findByRole("dialog", {
+      name: "Vista 3D de respuesta",
+    });
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    await screen.findByTestId("scene");
+    await waitFor(() =>
+      expect(screen.getByTestId("scene")).toHaveAttribute(
+        "data-animation",
+        "Armature|HOLA",
+      ),
+    );
+    expect(screen.getByTestId("scene")).toHaveAttribute("data-playing", "true");
   });
 
   it("does not fall back to another clip when the model lacks the mapped one", async () => {
@@ -186,7 +208,7 @@ describe("AvatarPreview", () => {
     await renderPreview(expression({ animationClipId: "NO_EXISTE" }));
     await userEvent.click(
       screen.getByRole("button", {
-        name: "Cargar modelo y buscar clip «Hola»",
+        name: "Abrir escena 3D",
       }),
     );
     await screen.findByTestId("scene");
@@ -198,7 +220,7 @@ describe("AvatarPreview", () => {
       "false",
     );
     expect(
-      screen.getByText(/no incluye el clip «NO_EXISTE»/),
+      within(screen.getByRole("dialog")).getByText(/no incluye el clip «NO_EXISTE»/),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Reproducir animación LSB" }),
@@ -231,7 +253,7 @@ describe("AvatarPreview", () => {
     await renderPreview(expression());
     await userEvent.click(
       screen.getByRole("button", {
-        name: "Cargar modelo y buscar clip «Hola»",
+        name: "Abrir escena 3D",
       }),
     );
     await screen.findByTestId("scene");
@@ -263,7 +285,7 @@ describe("AvatarPreview", () => {
     await renderPreview(expression());
     await userEvent.click(
       screen.getByRole("button", {
-        name: "Cargar modelo y buscar clip «Hola»",
+        name: "Abrir escena 3D",
       }),
     );
     await screen.findByTestId("scene");
