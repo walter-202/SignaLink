@@ -32,6 +32,8 @@ const AvatarScene = dynamic(() => import("@/features/avatar/AvatarScene"), {
 
 interface AvatarPreviewProps {
   expression?: LsbExpression | null;
+  autoStart?: boolean;
+  onClipsLoaded?: (clips: readonly string[] | null) => void;
 }
 
 function formatTime(value: number): string {
@@ -42,7 +44,11 @@ function formatTime(value: number): string {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
-export function AvatarPreview({ expression }: AvatarPreviewProps = {}) {
+export function AvatarPreview({
+  expression,
+  autoStart = false,
+  onClipsLoaded,
+}: AvatarPreviewProps = {}) {
   const [modelUrl, setModelUrl] = useState<string | null>(null);
   const [modelName, setModelName] = useState("");
   const [clips, setClips] = useState<string[]>([]);
@@ -61,6 +67,7 @@ export function AvatarPreview({ expression }: AvatarPreviewProps = {}) {
   const inputRef = useRef<HTMLInputElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const currentTimeRef = useRef(0);
+  const autoLoadAttemptRef = useRef<string | null>(null);
 
   const resolvedClip = useMemo(
     () => resolveAnimationClip(clips, expression?.animationClipId ?? null),
@@ -107,11 +114,12 @@ export function AvatarPreview({ expression }: AvatarPreviewProps = {}) {
       setClips(names);
       setClipsLoaded(true);
       setModelError(null);
+      onClipsLoaded?.(names);
       setIsPlaying(Boolean(nextClip));
       setCurrentTime(0);
       currentTimeRef.current = 0;
     },
-    [expression?.animationClipId],
+    [expression?.animationClipId, onClipsLoaded],
   );
   const handleClipDurations = useCallback((next: Record<string, number>) => {
     // Three.js reports clip durations in seconds; playback state uses milliseconds.
@@ -137,14 +145,15 @@ export function AvatarPreview({ expression }: AvatarPreviewProps = {}) {
     setClipsLoaded(false);
     setDurations({});
     setIsPlaying(false);
+    onClipsLoaded?.(null);
     setModelError({
       expressionId: expression?.id ?? null,
       message:
         "No se pudo cargar el modelo 3D. Inténtalo otra vez o selecciona otro GLB.",
     });
-  }, [expression?.id]);
+  }, [expression?.id, onClipsLoaded]);
 
-  function resetPlaybackState() {
+  const resetPlaybackState = useCallback(() => {
     setClips([]);
     setClipsLoaded(false);
     setDurations({});
@@ -153,9 +162,10 @@ export function AvatarPreview({ expression }: AvatarPreviewProps = {}) {
     setIsPlaying(false);
     setRestartToken((value) => value + 1);
     setModelError(null);
-  }
+    onClipsLoaded?.(null);
+  }, [onClipsLoaded]);
 
-  function loadConfiguredModel() {
+  const loadConfiguredModel = useCallback(() => {
     if (!CONFIGURED_MODEL_URL) return;
     resetPlaybackState();
     setModelUrl(CONFIGURED_MODEL_URL);
@@ -164,7 +174,30 @@ export function AvatarPreview({ expression }: AvatarPreviewProps = {}) {
         ? "Avatar demostrativo"
         : "Modelo configurado",
     );
-  }
+  }, [resetPlaybackState]);
+
+  useEffect(() => {
+    if (!autoStart || !expression?.animationClipId || !canLoadConfiguredModel) {
+      autoLoadAttemptRef.current = null;
+      return;
+    }
+    if (modelUrl || autoLoadAttemptRef.current === expression.id) return;
+
+    const expressionId = expression.id;
+    const timeout = window.setTimeout(() => {
+      if (autoLoadAttemptRef.current === expressionId) return;
+      autoLoadAttemptRef.current = expressionId;
+      loadConfiguredModel();
+    }, 350);
+    return () => window.clearTimeout(timeout);
+  }, [
+    autoStart,
+    canLoadConfiguredModel,
+    expression?.animationClipId,
+    expression?.id,
+    loadConfiguredModel,
+    modelUrl,
+  ]);
 
   function handleModelSelection(event: ChangeEvent<HTMLInputElement>) {
     const file = event.currentTarget.files?.[0];
@@ -206,20 +239,23 @@ export function AvatarPreview({ expression }: AvatarPreviewProps = {}) {
     setRestartToken((value) => value + 1);
   }
 
-  let statusMessage = "Selecciona una expresión del catálogo para buscar su animación.";
+  let statusMessage = expression
+    ? "Redacta una expresión exacta del catálogo para revisar su animación."
+    : "Escribe una expresión exacta del catálogo para iniciar la vista 3D.";
   if (activeModelError) {
     statusMessage = activeModelError;
   } else if (expression && !expression.animationClipId) {
     statusMessage = "Esta expresión no tiene una animación LSB registrada.";
   } else if (expression && !hasModel && canLoadConfiguredModel) {
-    statusMessage =
-      CONFIGURED_MODEL_URL === BUNDLED_AVATAR_URL
-        ? "El clip propio de Hola está disponible bajo demanda; el modelo pesa 20.5 MB."
-        : "El modelo configurado se carga solo cuando pidas reproducir la expresión.";
+    statusMessage = autoStart
+      ? "Coincidencia exacta: cargando el modelo para esta expresión."
+      : CONFIGURED_MODEL_URL === BUNDLED_AVATAR_URL
+        ? "Hay un clip propio provisional de Hola. El modelo de 20.5 MB se carga cuando lo solicitas."
+        : "El modelo configurado se carga cuando solicitas esta expresión.";
   } else if (expression && !hasModel && IS_BUNDLED_MODEL_DISABLED) {
     statusMessage = "El avatar 3D está desactivado en esta instalación.";
   } else if (expression && !hasModel) {
-    statusMessage = "No hay una animación disponible para esta expresión. Puedes probar un GLB local.";
+    statusMessage = "No hay un clip integrado para esta expresión. Puedes cargar un modelo GLB local.";
   } else if (isLoadingModel) {
     statusMessage = "Cargando el modelo 3D…";
   } else if (hasModel && clips.length === 0) {
@@ -227,8 +263,20 @@ export function AvatarPreview({ expression }: AvatarPreviewProps = {}) {
   } else if (resolvedClip) {
     statusMessage = `Clip «${resolvedClip}» listo. Sin validación lingüística registrada.`;
   } else if (expression?.animationClipId) {
-    statusMessage = `El modelo no incluye el clip «${expression.animationClipId}». Animación pendiente de implementación.`;
+    statusMessage = `El modelo no incluye el clip «${expression.animationClipId}».`;
   }
+
+  const previewStatus = activeModelError
+    ? "Error de carga"
+    : isLoadingModel
+      ? "Cargando"
+      : resolvedClip
+        ? "Clip detectado"
+        : expression?.animationStatus === "provisional"
+          ? "Provisional"
+          : expression
+            ? "Sin clip"
+            : "En espera";
 
   return (
     <section
@@ -238,11 +286,15 @@ export function AvatarPreview({ expression }: AvatarPreviewProps = {}) {
       <header className="compact-card-heading">
         <div className="inline-title">
           <Play size={17} aria-hidden="true" />
-          <h2 id="avatar-preview-title">Vista previa en LSB</h2>
+          <h2 id="avatar-preview-title">Vista 3D de respuesta</h2>
         </div>
-        <span className="demo-label">Demostración</span>
+        <span className="demo-label">{previewStatus}</span>
       </header>
-      <div className="avatar-preview-viewport" ref={previewRef}>
+      <div
+        className="avatar-preview-viewport"
+        ref={previewRef}
+        aria-busy={isLoadingModel}
+      >
         {modelUrl ? (
           <SceneErrorBoundary key={modelUrl} onError={handleModelError}>
             <AvatarScene
@@ -267,9 +319,11 @@ export function AvatarPreview({ expression }: AvatarPreviewProps = {}) {
           />
         )}
         <span className="avatar-demo-warning">
-          {resolvedClip || expression?.animationStatus === "provisional"
-            ? "Clip sin validación"
-            : "Sin animación LSB"}
+          {modelUrl
+            ? resolvedClip
+              ? "Clip sin validación"
+              : "Sin clip en el modelo"
+            : "Imagen referencial"}
         </span>
       </div>
       <p

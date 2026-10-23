@@ -1,7 +1,6 @@
 "use client";
 
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
 import { Suspense, useCallback } from "react";
 import type { AnimationClip } from "three";
 import GltfAvatar from "./GltfAvatar";
@@ -42,6 +41,7 @@ export default function AvatarScene(props: AvatarSceneProps) {
       className="avatar-canvas"
       dpr={[1, 1.5]}
       camera={{ position: [0, 1.55, 4.8], fov: 34, near: 0.1, far: 50 }}
+      onCreated={({ camera }) => camera.lookAt(0, 1.25, 0)}
       gl={{ antialias: true, alpha: true, powerPreference: "low-power" }}
       fallback={
         <p className="scene-state">
@@ -83,15 +83,7 @@ export default function AvatarScene(props: AvatarSceneProps) {
           <ProvisionalAvatar />
         )}
       </Suspense>
-      <OrbitControls
-        makeDefault
-        target={[0, 1.25, 0]}
-        minDistance={2.8}
-        maxDistance={7}
-        minPolarAngle={0.35}
-        maxPolarAngle={Math.PI * 0.9}
-        enablePan={false}
-      />
+
     </Canvas>
   );
 }

@@ -19,9 +19,11 @@ import {
   type LsbResolution,
 } from "../application/resolve-lsb-expression";
 import { normalizeSpanish } from "../application/normalize-spanish";
+import { resolveAnimationClip } from "../application/resolve-animation";
 
 interface LsbExpressionPanelProps {
   draft: string;
+  availableModelClips?: readonly string[] | null;
   onResolved?: (expression: LsbExpression | null, sourceDraft?: string) => void;
 }
 
@@ -36,8 +38,24 @@ function announce(resolution: LsbResolution | null): string {
   return "Escribe o dicta una frase para buscar en el catálogo.";
 }
 
+function animationAvailability(
+  expression: LsbExpression,
+  availableModelClips: readonly string[] | null,
+): string {
+  if (!expression.animationClipId) return "Sin clip asignado";
+  if (availableModelClips !== null) {
+    return resolveAnimationClip(availableModelClips, expression.animationClipId)
+      ? "Disponible en este modelo"
+      : "No está en este modelo";
+  }
+  return expression.animationStatus === "provisional"
+    ? "Clip provisional"
+    : "No incluido en la app";
+}
+
 export function LsbExpressionPanel({
   draft,
+  availableModelClips = null,
   onResolved,
 }: LsbExpressionPanelProps) {
   const [query, setQuery] = useState("");
@@ -45,35 +63,53 @@ export function LsbExpressionPanel({
   const [resolutionDraft, setResolutionDraft] = useState<string | null>(null);
   const [catalogOpen, setCatalogOpen] = useState(false);
   const matches = searchLsbExpressions(query);
+  const draftResolution = resolveLsbExpression(draft);
+  const hasDraftMatch = draftResolution.status === "matched";
   const listVisible = catalogOpen;
-  const draftChangedSinceResolution =
+  const manualResolutionIsCurrent =
     resolutionDraft !== null &&
-    normalizeSpanish(resolutionDraft) !== normalizeSpanish(draft);
-  const visibleResolution = draftChangedSinceResolution ? null : resolution;
+    normalizeSpanish(resolutionDraft) === normalizeSpanish(draft);
+  const draftChangedSinceResolution =
+    resolutionDraft !== null && !manualResolutionIsCurrent;
+  const visibleResolution = manualResolutionIsCurrent
+    ? resolution
+    : hasDraftMatch
+      ? draftResolution
+      : null;
+  const manualBrowseDiffersFromDraft =
+    manualResolutionIsCurrent &&
+    hasDraftMatch &&
+    resolution?.status === "matched" &&
+    resolution.expression.id !== draftResolution.expression.id;
 
-  function resolve(value: string, sourceDraft?: string) {
+  function resolve(value: string, sourceDraft = draft) {
     const next = resolveLsbExpression(value);
     setResolution(next);
-    setResolutionDraft(sourceDraft ?? null);
+    setResolutionDraft(sourceDraft);
     const expression = next.status === "matched" ? next.expression : null;
-    if (sourceDraft === undefined) onResolved?.(expression);
-    else onResolved?.(expression, sourceDraft);
+    onResolved?.(expression, sourceDraft);
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    resolve(query);
-  }
-
-  function handleUseDraft() {
-    setQuery(draft);
-    resolve(draft, draft);
+    resolve(query, draft);
   }
 
   function handleSelect(expression: LsbExpression) {
     setQuery(expression.spanish);
-    resolve(expression.spanish);
+    resolve(expression.spanish, draft);
     setCatalogOpen(false);
+  }
+
+  function availabilityClass(expression: LsbExpression): string {
+    if (availableModelClips !== null) {
+      return resolveAnimationClip(availableModelClips, expression.animationClipId)
+        ? "lsb-catalog-availability lsb-catalog-availability--available"
+        : "lsb-catalog-availability lsb-catalog-availability--missing";
+    }
+    return expression.animationStatus === "provisional"
+      ? "lsb-catalog-availability lsb-catalog-availability--provisional"
+      : "lsb-catalog-availability lsb-catalog-availability--missing";
   }
 
   return (
@@ -89,15 +125,14 @@ export function LsbExpressionPanel({
         <span className="demo-label">Módulo 1</span>
       </header>
 
-      <p className="help-text">
-        {LSB_EXPRESSIONS.length} saludos documentados en {LSB_SOURCE.section}{" "}
-        (páginas {LSB_SOURCE.pages}; índice p. {LSB_SOURCE.indexPage}). La
-        fuente no incluye glosas escritas ni animaciones 3D.
+      <p className="help-text lsb-catalog-intro">
+        {LSB_EXPRESSIONS.length} saludos documentados. Una coincidencia exacta
+        muestra aquí la expresión; el catálogo no traduce frases nuevas.
       </p>
 
       <form className="lsb-lookup" onSubmit={handleSubmit}>
         <label className="field-label" htmlFor="lsb-query">
-          Buscar expresión documentada
+          Buscar expresión
         </label>
         <div className="search-field">
           <Search size={15} aria-hidden="true" />
@@ -110,33 +145,32 @@ export function LsbExpressionPanel({
               setResolutionDraft(null);
               onResolved?.(null);
             }}
-            placeholder="Ej. Hola, Gracias, ¿Cómo estás?"
+            placeholder="Ej. Hola, Gracias"
             autoComplete="off"
           />
-        </div>
-        <div className="lsb-actions">
           <Button size="small" variant="secondary" type="submit">
-            Buscar en el catálogo
-          </Button>
-          <Button
-            size="small"
-            variant="ghost"
-            onClick={handleUseDraft}
-            disabled={!draft.trim()}
-          >
-            Usar el borrador
+            Buscar
           </Button>
         </div>
       </form>
 
       <div className="sr-only" role="status" aria-live="polite">
-        {draftChangedSinceResolution ? "" : announce(visibleResolution)}
+        {draftChangedSinceResolution && !hasDraftMatch
+          ? ""
+          : announce(visibleResolution)}
       </div>
 
-      {draftChangedSinceResolution ? (
+      {draftChangedSinceResolution && !hasDraftMatch ? (
         <p className="composer-notice" role="status">
-          El borrador cambió desde la búsqueda. Vuelve a usarlo para actualizar
-          la expresión que se mostrará en el avatar.
+          El borrador cambió. La vista previa se actualizará cuando coincida
+          exactamente con una expresión del catálogo.
+        </p>
+      ) : null}
+
+      {manualBrowseDiffersFromDraft && draftResolution.status === "matched" ? (
+        <p className="composer-notice">
+          Exploración manual: la vista 3D sigue la expresión exacta del borrador
+          («{draftResolution.expression.spanish}»).
         </p>
       ) : null}
 
@@ -146,34 +180,22 @@ export function LsbExpressionPanel({
           aria-label={`Ficha de ${visibleResolution.expression.spanish}`}
         >
           <div className="lsb-result-heading">
-            <strong>{visibleResolution.expression.spanish}</strong>
+            <div className="lsb-result-title">
+              <strong>{visibleResolution.expression.spanish}</strong>
+              <span className="lsb-result-page">
+                {LSB_SOURCE.section} · p. {visibleResolution.expression.page}
+              </span>
+            </div>
             <span className="lsb-result-badge">Documentado</span>
           </div>
           <dl className="lsb-facts">
             <div>
-              <dt>Fuente</dt>
-              <dd>{LSB_SOURCE.document}</dd>
-            </div>
-            <div>
-              <dt>Sección</dt>
-              <dd>
-                {LSB_SOURCE.section} · p. {visibleResolution.expression.page}
-              </dd>
-            </div>
-            <div>
-              <dt>Glosa escrita</dt>
-              <dd>No documentada</dd>
-            </div>
-            <div>
-              <dt>Ilustración</dt>
-              <dd>Disponible en el PDF original; no se redistribuye</dd>
-            </div>
-            <div>
               <dt>Animación 3D</dt>
               <dd>
-                {visibleResolution.expression.animationStatus === "provisional"
-                  ? "Provisional (sin revisión)"
-                  : "No disponible"}
+                {animationAvailability(
+                  visibleResolution.expression,
+                  availableModelClips,
+                )}
               </dd>
             </div>
             <div>
@@ -183,25 +205,33 @@ export function LsbExpressionPanel({
               </dd>
             </div>
           </dl>
-          <p className="help-text">{LSB_GLOSS_NOTE}</p>
-          <p className="help-text">{LSB_ANIMATION_NOTE}</p>
-          <p className="help-text">{LSB_SOURCE.rights}</p>
+          <details className="lsb-source-details">
+            <summary>Fuente y alcance</summary>
+            <p>
+              {LSB_SOURCE.document}, {LSB_SOURCE.section}, página{" "}
+              {visibleResolution.expression.page}. El índice del módulo está en
+              la página {LSB_SOURCE.indexPage}.
+            </p>
+            <p>{LSB_GLOSS_NOTE}</p>
+            <p>{LSB_ANIMATION_NOTE}</p>
+            <p>{LSB_SOURCE.rights}</p>
+          </details>
         </article>
       ) : null}
 
       {visibleResolution?.status === "unknown" ? (
         <p className="composer-notice">
           No hay una expresión documentada en el catálogo para «
-          {query.trim() || visibleResolution.normalizedInput}». El sistema no
-          inventa traducciones ni glosas: reformula la frase o consulta una de{" "}
-          {LSB_EXPRESSIONS.length} expresiones disponibles.
+          {query.trim() || visibleResolution.normalizedInput}». No se inventan
+          traducciones ni glosas; consulta una de las {LSB_EXPRESSIONS.length}{" "}
+          expresiones disponibles.
         </p>
       ) : null}
 
       {visibleResolution?.status === "empty" ? (
         <p className="composer-notice">
-          Escribe o dicta una frase en «Redactar respuesta» y usa «Usar el
-          borrador» para consultarla.
+          Escribe una expresión exacta en «Redactar respuesta» o búscala en el
+          catálogo para revisar su ficha.
         </p>
       ) : null}
 
@@ -213,13 +243,13 @@ export function LsbExpressionPanel({
         onClick={() => setCatalogOpen((open) => !open)}
       >
         {listVisible
-          ? "Ocultar catálogo"
-          : `Ver los ${LSB_EXPRESSIONS.length} saludos`}
+          ? "Ocultar expresiones"
+          : `Ver las ${LSB_EXPRESSIONS.length} expresiones`}
       </button>
 
       {listVisible ? (
         <div
-          className="frequent-phrases"
+          className="frequent-phrases lsb-catalog-list"
           id="lsb-catalog-list"
           aria-label="Expresiones documentadas"
         >
@@ -232,12 +262,28 @@ export function LsbExpressionPanel({
               <button
                 key={expression.id}
                 type="button"
-                aria-label={`Ver ficha de ${expression.spanish}`}
+                aria-label={
+                  `Ver ficha de ${expression.spanish}; ` +
+                  animationAvailability(expression, availableModelClips)
+                }
                 onClick={() => handleSelect(expression)}
               >
-                <span>{expression.spanish}</span>
-                <span className="lsb-catalog-source" aria-hidden="true">
-                  p. {expression.page}
+                <span className="lsb-catalog-row-title">
+                  <strong>{expression.spanish}</strong>
+                  <small>p. {expression.page}</small>
+                </span>
+                <span className={availabilityClass(expression)}>
+                  {availableModelClips === null &&
+                  expression.animationStatus === "provisional"
+                    ? "3D provisional"
+                    : availableModelClips === null
+                      ? "No integrado"
+                      : resolveAnimationClip(
+                            availableModelClips,
+                            expression.animationClipId,
+                          )
+                        ? "Disponible"
+                        : "Sin clip"}
                 </span>
               </button>
             ))
