@@ -1,5 +1,5 @@
 const DIACRITICS = /[\u0300-\u036f]/g;
-const PUNCTUATION = /[¿?¡!.,;:()"'«»]/g;
+const PUNCTUATION = /\p{P}+/gu;
 const WHITESPACE = /\s+/g;
 
 /**

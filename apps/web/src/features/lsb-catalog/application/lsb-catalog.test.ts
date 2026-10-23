@@ -21,6 +21,10 @@ describe("normalizeSpanish", () => {
   it("keeps an unsupported phrase as words instead of guessing a sign", () => {
     expect(normalizeSpanish("Nos vemos luego")).toBe("nos vemos luego");
   });
+
+  it("normalizes Unicode dashes and ellipses as punctuation", () => {
+    expect(normalizeSpanish(" ¡¿CÓMO—ESTÁS…?! ")).toBe("como estas");
+  });
 });
 
 describe("resolveLsbExpression", () => {
@@ -39,6 +43,13 @@ describe("resolveLsbExpression", () => {
     });
     expect(resolveLsbExpression("como estas")).toMatchObject({
       status: "matched",
+    });
+  });
+
+  it("matches a documented phrase despite Unicode punctuation", () => {
+    expect(resolveLsbExpression("¡¿Cómo—estás…?!")).toMatchObject({
+      status: "matched",
+      expression: { spanish: "¿Cómo estás?" },
     });
   });
 

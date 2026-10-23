@@ -36,8 +36,10 @@ interface AvatarPreviewProps {
 
 function formatTime(value: number): string {
   if (!Number.isFinite(value) || value <= 0) return "0:00";
-  const seconds = Math.floor(value / 1_000);
-  return `0:${String(seconds).padStart(2, "0")}`;
+  const totalSeconds = Math.floor(value / 1_000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
 export function AvatarPreview({ expression }: AvatarPreviewProps = {}) {
@@ -281,16 +283,13 @@ export function AvatarPreview({ expression }: AvatarPreviewProps = {}) {
           size="small"
           variant="secondary"
           onClick={loadConfiguredModel}
-          disabled={isLoadingModel}
           aria-describedby="avatar-load-help"
         >
           {activeModelError
             ? "Reintentar carga"
-            : isLoadingModel
-              ? "Cargando avatar…"
-              : CONFIGURED_MODEL_URL === BUNDLED_AVATAR_URL
-                ? "Ver «Hola» en 3D · 20.5 MB"
-                : `Buscar clip «${expression?.spanish ?? ""}»`}
+            : CONFIGURED_MODEL_URL === BUNDLED_AVATAR_URL
+              ? "Ver «Hola» en 3D · 20.5 MB"
+              : `Cargar modelo y buscar clip «${expression?.spanish ?? ""}»`}
         </Button>
       ) : null}
       <span className="sr-only" id="avatar-load-help">

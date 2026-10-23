@@ -85,7 +85,9 @@ describe("AvatarPreview", () => {
     );
     await renderPreview(expression());
     await userEvent.click(
-      screen.getByRole("button", { name: "Buscar clip «Hola»" }),
+      screen.getByRole("button", {
+        name: "Cargar modelo y buscar clip «Hola»",
+      }),
     );
     await screen.findByTestId("scene");
     await waitFor(() =>
@@ -123,6 +125,29 @@ describe("AvatarPreview", () => {
     ).toBeInTheDocument();
   });
 
+  it("formats durations longer than a minute as minutes and seconds", async () => {
+    const previousDuration = scene.durations["Armature|HOLA"];
+    scene.durations["Armature|HOLA"] = 61.2;
+    try {
+      vi.stubEnv(
+        "NEXT_PUBLIC_LSB_AVATAR_MODEL_URL",
+        "https://example.com/avatar.glb",
+      );
+      await renderPreview(expression());
+      await userEvent.click(
+        screen.getByRole("button", {
+          name: "Cargar modelo y buscar clip «Hola»",
+        }),
+      );
+      await screen.findByTestId("scene");
+      await waitFor(() =>
+        expect(screen.getByText("0:00 / 1:01")).toBeInTheDocument(),
+      );
+    } finally {
+      scene.durations["Armature|HOLA"] = previousDuration;
+    }
+  });
+
   it("keeps the provisional figure when the bundled avatar is disabled", async () => {
     vi.stubEnv("NEXT_PUBLIC_LSB_AVATAR_MODEL_URL", "off");
     await renderPreview(expression());
@@ -143,7 +168,9 @@ describe("AvatarPreview", () => {
     );
     await renderPreview(expression({ animationClipId: "NO_EXISTE" }));
     await userEvent.click(
-      screen.getByRole("button", { name: "Buscar clip «Hola»" }),
+      screen.getByRole("button", {
+        name: "Cargar modelo y buscar clip «Hola»",
+      }),
     );
     await screen.findByTestId("scene");
     await waitFor(() =>
@@ -186,7 +213,9 @@ describe("AvatarPreview", () => {
     );
     await renderPreview(expression());
     await userEvent.click(
-      screen.getByRole("button", { name: "Buscar clip «Hola»" }),
+      screen.getByRole("button", {
+        name: "Cargar modelo y buscar clip «Hola»",
+      }),
     );
     await screen.findByTestId("scene");
     await waitFor(() =>
@@ -216,7 +245,9 @@ describe("AvatarPreview", () => {
     );
     await renderPreview(expression());
     await userEvent.click(
-      screen.getByRole("button", { name: "Buscar clip «Hola»" }),
+      screen.getByRole("button", {
+        name: "Cargar modelo y buscar clip «Hola»",
+      }),
     );
     await screen.findByTestId("scene");
     await waitFor(() =>
