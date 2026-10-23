@@ -16,16 +16,20 @@ Abre `http://localhost:3000`. La ruta `/` redirige a `/atender`.
 ## Vistas
 
 - **`/login`**: acceso de personal con correo y contraseña de Supabase Auth. La aplicación no ofrece registro público.
-- **`/atender`**: atención activa guardada, cámara y landmarks locales opcionales, captura LSB continua experimental con ONNX, transcripción editable y confirmación humana, conversación, respuestas escritas o dictadas, frases frecuentes, observaciones y vista de avatar.
+- **`/atender`**: atención activa guardada, cámara y landmarks locales opcionales, captura LSB continua experimental con ONNX, transcripción editable y confirmación humana, conversación, respuestas escritas o dictadas, frases frecuentes, observaciones, catálogo de saludos documentados y vista previa 3D bajo demanda.
 - **`/historial`**: búsqueda, filtros por estado y fecha, paginación, resumen de conversaciones guardadas, detalle y reapertura confirmada.
 
 La interfaz se adapta a móvil, incluye navegación por teclado, etiquetas para controles, estados accesibles, opción de contraste alto y respeto por `prefers-reduced-motion`.
 
 ## Límites del MVP
 
-La cámara usa `getUserMedia` a través de un adaptador y solo se activa con una acción explícita. La vista previa no se graba, no se envía a un servidor y se libera al detenerla, al cambiar de atención o al finalizar la sesión. Si el permiso se deniega o no hay cámara, el personal puede escribir la respuesta. El modelo LSB de referencia v4 se carga automáticamente: clasifica segmentos aislados de 30 frames (~1 s a ~30 fps) y 58 etiquetas. El modo continuo segmenta por movimiento y acumula etiquetas en un borrador editable, pero no traduce frases continuas ni cubre LSB general; cada frase requiere confirmación humana. Se descarga desde el mismo origen con runtime WASM local; sus resultados requieren revisión humana. La atribución MIT está en `public/models/lsb-reference-v4/`, pero la procedencia/licencia de los datos de entrenamiento no se documenta por separado. El dictado usa Web Speech API del navegador cuando está disponible, con `es-BO`; el texto final se agrega al borrador y requiere revisión antes del envío. La aplicación no envía el audio a un endpoint propio, aunque el navegador o su proveedor pueden procesarlo según su implementación y políticas. Si el dictado no está disponible o falla, el personal puede escribir la respuesta. Las atenciones, respuestas, mensajes revisados y observaciones se guardan en Supabase. No se almacenan frames, imágenes, video ni audio de la cámara. El avatar de imagen es ilustrativo y no genera señas verificadas. Se puede cargar un `.glb` de hasta 25 MB para probar localmente un modelo y sus clips; el archivo no se envía a un servidor.
+La cámara usa `getUserMedia` a través de un adaptador y solo se activa con una acción explícita. La vista previa no se graba, no se envía a un servidor y se libera al detenerla, al cambiar de atención o al finalizar la sesión. Si el permiso se deniega o no hay cámara, el personal puede escribir la respuesta. El modelo LSB de referencia v4 se carga automáticamente: clasifica segmentos aislados de 30 frames (~1 s a ~30 fps) y 58 etiquetas. El modo continuo segmenta por movimiento y acumula etiquetas en un borrador editable, pero no traduce frases continuas ni cubre LSB general; cada frase requiere confirmación humana. Se descarga desde el mismo origen con runtime WASM local; sus resultados requieren revisión humana. La atribución MIT está en `public/models/lsb-reference-v4/`, pero la procedencia/licencia de los datos de entrenamiento no se documenta por separado.
 
-Las imágenes del avatar son recursos generados para la interfaz de demostración. No representan personas usuarias ni contenido lingüístico validado.
+El catálogo Español → LSB ofrece 19 saludos documentados en el Módulo 1 del curso de LSB. Solo resuelve una etiqueta o alias que coincide con la frase completa tras normalizar acentos, mayúsculas y puntuación; no traduce frases ni usa el clasificador de cámara. No redistribuye las ilustraciones del PDF ni inventa glosas. El avatar 3D trae un clip propio de «Hola» marcado provisional, pendiente de revisión por una persona competente en LSB. Su GLB pesa 20,540,968 bytes (20.5 MB) y se descarga únicamente tras elegir «Hola» y pulsar el botón de reproducción 3D. Las demás expresiones no reutilizan ese clip. `NEXT_PUBLIC_LSB_AVATAR_MODEL_URL=off` desactiva el modelo incluido; una ruta personalizada solo se carga cuando se solicita una expresión con clip asociado. El GLB local se puede probar en el navegador hasta 25 MB y no se envía a un servidor.
+
+El dictado usa Web Speech API del navegador cuando está disponible, con `es-BO`; el texto final se agrega al borrador y requiere revisión antes del envío. La aplicación no envía el audio a un endpoint propio, aunque el navegador o su proveedor pueden procesarlo según su implementación y políticas. Si el dictado no está disponible o falla, el personal puede escribir la respuesta. Las atenciones, respuestas, mensajes revisados y observaciones se guardan en Supabase. No se almacenan frames, imágenes, video ni audio de la cámara.
+
+La imagen del avatar que se muestra antes de cargar el GLB es un recurso generado para la interfaz. No representa personas usuarias ni contenido lingüístico validado.
 
 ## Landmarks locales
 
@@ -45,6 +49,7 @@ src/
   features/
     attention/                 # Captura, conversación, respuesta y estado de sesión
     avatar/                    # Visor GLB reutilizado en la vista previa
+    lsb-catalog/               # Catálogo exacto de saludos, fuentes y estado de revisión
     camera/                    # Puerto y adaptador de getUserMedia
     communication/             # Puerto de voz, adaptador de navegador y controles
     procedure-history/          # Dominio, fixtures, filtros y vista de historial

@@ -4,6 +4,7 @@ import { Component, type ErrorInfo, type ReactNode } from "react";
 
 interface SceneErrorBoundaryProps {
   children: ReactNode;
+  onError?: (error: Error) => void;
 }
 
 interface SceneErrorBoundaryState {
@@ -22,6 +23,7 @@ export default class SceneErrorBoundary extends Component<
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("No se pudo cargar el modelo 3D.", error, info.componentStack);
+    this.props.onError?.(error);
   }
 
   render() {
