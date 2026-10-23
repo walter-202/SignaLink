@@ -1,29 +1,66 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Image from "next/image";
-import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
-import { Maximize, Pause, Play, Upload } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+} from "react";
+import { Maximize, Pause, Play, Repeat, Square, Upload } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import SceneErrorBoundary from "@/features/avatar/SceneErrorBoundary";
+import { resolveAnimationClip } from "@/features/lsb-catalog/application/resolve-animation";
+import type { LsbExpression } from "@/features/lsb-catalog/domain/lsb-expression";
 
 const MAX_MODEL_SIZE = 25 * 1024 * 1024;
-const DEMO_DURATION_MS = 8_000;
+const CONFIGURED_MODEL_URL =
+  process.env.NEXT_PUBLIC_LSB_AVATAR_MODEL_URL === "off"
+    ? null
+    : process.env.NEXT_PUBLIC_LSB_AVATAR_MODEL_URL ||
+      "/avatars/signalink_avatar.glb";
 const AvatarScene = dynamic(() => import("@/features/avatar/AvatarScene"), {
   ssr: false,
   loading: () => <p className="scene-state">Preparando el modelo 3D…</p>,
 });
 
-export function AvatarPreview() {
-  const [modelUrl, setModelUrl] = useState<string | null>(null);
-  const [modelName, setModelName] = useState("");
+interface AvatarPreviewProps {
+  expression?: LsbExpression | null;
+}
+
+function formatTime(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return "0:00";
+  const seconds = Math.floor(value / 1_000);
+  return `0:${String(seconds).padStart(2, "0")}`;
+}
+
+export function AvatarPreview({ expression }: AvatarPreviewProps = {}) {
+  const [modelUrl, setModelUrl] = useState<string | null>(CONFIGURED_MODEL_URL);
+  const [modelName, setModelName] = useState(
+    CONFIGURED_MODEL_URL ? "Avatar demostrativo" : "",
+  );
   const [clips, setClips] = useState<string[]>([]);
-  const [selectedClip, setSelectedClip] = useState("");
+  const [clipsLoaded, setClipsLoaded] = useState(false);
+  const [durations, setDurations] = useState<Record<string, number>>({});
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isLooping, setIsLooping] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  const [restartToken, setRestartToken] = useState(0);
   const [fileError, setFileError] = useState("");
   const objectUrlRef = useRef<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
+  const currentTimeRef = useRef(0);
+
+  const resolvedClip = useMemo(
+    () => resolveAnimationClip(clips, expression?.animationClipId ?? null),
+    [clips, expression?.animationClipId],
+  );
+  const selectedClip = resolvedClip ?? "";
+  const duration = resolvedClip ? (durations[resolvedClip] ?? 0) : 0;
+  const hasModel = Boolean(modelUrl);
 
   useEffect(() => {
     return () => {
@@ -32,27 +69,46 @@ export function AvatarPreview() {
   }, []);
 
   useEffect(() => {
-    if (!isPlaying) return;
-    const startedAt = Date.now() - currentTime;
-    const progressTimer = window.setInterval(() => {
-      setCurrentTime(Math.min(Date.now() - startedAt, DEMO_DURATION_MS));
+    if (!isPlaying || !selectedClip || duration <= 0) return;
+    const startedAt = Date.now() - currentTimeRef.current;
+    const timer = window.setInterval(() => {
+      const next = Math.min(Date.now() - startedAt, duration);
+      currentTimeRef.current = next;
+      setCurrentTime(next);
     }, 120);
-    const stopTimer = window.setTimeout(() => {
-      setIsPlaying(false);
-      setCurrentTime(0);
-    }, Math.max(0, DEMO_DURATION_MS - currentTime));
-    return () => {
-      window.clearInterval(progressTimer);
-      window.clearTimeout(stopTimer);
-    };
-  }, [currentTime, isPlaying]);
+    return () => window.clearInterval(timer);
+  }, [isPlaying, selectedClip, duration]);
 
-  const handleAnimationsLoaded = useCallback((names: string[]) => {
-    setClips(names);
-    setSelectedClip((current) => names.includes(current) ? current : names[0] ?? "");
-    setIsPlaying(false);
+  const handleAnimationsLoaded = useCallback(
+    (names: string[]) => {
+      const nextClip = resolveAnimationClip(
+        names,
+        expression?.animationClipId ?? null,
+      );
+      setClips(names);
+      setClipsLoaded(true);
+      setIsPlaying(Boolean(nextClip));
+      setCurrentTime(0);
+      currentTimeRef.current = 0;
+    },
+    [expression?.animationClipId],
+  );
+  const handleClipDurations = useCallback((next: Record<string, number>) => {
+    // Three.js reports clip durations in seconds; playback state uses milliseconds.
+    setDurations(
+      Object.fromEntries(
+        Object.entries(next).map(([name, seconds]) => [
+          name,
+          Math.round(seconds * 1_000),
+        ]),
+      ),
+    );
   }, []);
-  const handlePlaybackEnded = useCallback(() => setIsPlaying(false), []);
+  const handlePlaybackEnded = useCallback(() => {
+    setIsPlaying(false);
+    setCurrentTime(duration);
+    currentTimeRef.current = duration;
+  }, [duration]);
 
   function handleModelSelection(event: ChangeEvent<HTMLInputElement>) {
     const file = event.currentTarget.files?.[0];
@@ -72,74 +128,145 @@ export function AvatarPreview() {
     setModelUrl(nextUrl);
     setModelName(file.name);
     setClips([]);
-    setSelectedClip("");
+    setClipsLoaded(false);
+    setDurations({});
     setCurrentTime(0);
+    currentTimeRef.current = 0;
     setIsPlaying(false);
+    setRestartToken((value) => value + 1);
     setFileError("");
   }
 
   function togglePlayback() {
-    if (currentTime >= DEMO_DURATION_MS) setCurrentTime(0);
+    if (!selectedClip) return;
+    if (currentTimeRef.current >= duration) {
+      setCurrentTime(0);
+      currentTimeRef.current = 0;
+      setRestartToken((value) => value + 1);
+      setIsPlaying(true);
+      return;
+    }
     setIsPlaying((playing) => !playing);
   }
 
-  function formatTime(value: number): string {
-    const seconds = Math.floor(value / 1_000);
-    return `0:${String(seconds).padStart(2, "0")}`;
+  function stopPlayback() {
+    setIsPlaying(false);
+    setCurrentTime(0);
+    currentTimeRef.current = 0;
+    setRestartToken((value) => value + 1);
   }
 
+  const statusMessage = !expression
+    ? "Selecciona una expresión del catálogo para buscar su animación."
+    : !expression.animationClipId
+      ? "Esta expresión no tiene una animación LSB registrada."
+      : !hasModel
+        ? "Modelo 3D provisional. Configura un GLB autorizado con clips LSB para reproducir la seña."
+        : !clipsLoaded
+          ? "Cargando el modelo 3D…"
+          : clips.length === 0
+            ? "El modelo no contiene clips de animación."
+            : resolvedClip
+              ? `Clip «${resolvedClip}» listo. Sin validación lingüística registrada.`
+              : `El modelo no incluye el clip «${expression.animationClipId}». Animación pendiente de implementación.`;
+
   return (
-    <section className="panel-card avatar-preview-card" aria-labelledby="avatar-preview-title">
+    <section
+      className="panel-card avatar-preview-card"
+      aria-labelledby="avatar-preview-title"
+    >
       <header className="compact-card-heading">
-        <div className="inline-title"><Play size={17} aria-hidden="true" /><h2 id="avatar-preview-title">Vista previa en LSB</h2></div>
+        <div className="inline-title">
+          <Play size={17} aria-hidden="true" />
+          <h2 id="avatar-preview-title">Vista previa en LSB</h2>
+        </div>
         <span className="demo-label">Demostración</span>
       </header>
       <div className="avatar-preview-viewport" ref={previewRef}>
-        {modelUrl ? (
+        <SceneErrorBoundary
+          key={`${modelUrl ?? "provisional"}-${expression?.id ?? "none"}`}
+        >
           <AvatarScene
             modelUrl={modelUrl}
             animationName={selectedClip}
             isPlaying={isPlaying}
-            isLooping
+            isLooping={isLooping}
             speed={1}
+            restartToken={restartToken}
             onAnimationsLoaded={handleAnimationsLoaded}
+            onClipDurations={handleClipDurations}
             onPlaybackEnded={handlePlaybackEnded}
           />
-        ) : (
-          <Image
-            width={800}
-            height={800}
-            src="/images/avatar-demo.png"
-            alt="Avatar 3D de demostración en una pose neutra; la imagen no muestra una seña LSB validada"
-          />
-        )}
-        <span className="avatar-demo-warning">Sin seña validada</span>
+        </SceneErrorBoundary>
+        <span className="avatar-demo-warning">
+          {resolvedClip ? "Clip sin validación" : "Sin animación LSB"}
+        </span>
       </div>
+      <p className="avatar-expression-note" role="status">
+        {statusMessage}
+      </p>
       <div className="avatar-playback-controls">
-        <Button size="icon" variant="ghost" onClick={togglePlayback} aria-label={isPlaying ? "Pausar demostración" : "Reproducir demostración"}>
-          {isPlaying ? <Pause size={17} fill="currentColor" aria-hidden="true" /> : <Play size={17} fill="currentColor" aria-hidden="true" />}
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={togglePlayback}
+          disabled={!selectedClip}
+          aria-label={
+            isPlaying ? "Pausar animación LSB" : "Reproducir animación LSB"
+          }
+        >
+          {isPlaying ? (
+            <Pause size={17} fill="currentColor" aria-hidden="true" />
+          ) : (
+            <Play size={17} fill="currentColor" aria-hidden="true" />
+          )}
         </Button>
-        <span className="playback-time">{formatTime(currentTime)}</span>
-        <input
-          className="playback-seek"
-          type="range"
-          min="0"
-          max={DEMO_DURATION_MS}
-          step="200"
-          value={currentTime}
-          onChange={(event) => setCurrentTime(Number(event.currentTarget.value))}
-          aria-label="Posición de la reproducción de demostración"
-        />
-        <span className="playback-time">0:08</span>
-        <Button size="icon" variant="ghost" onClick={() => void previewRef.current?.requestFullscreen?.()} aria-label="Pantalla completa del avatar">
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={stopPlayback}
+          disabled={!selectedClip}
+          aria-label="Detener animación LSB"
+        >
+          <Square size={15} fill="currentColor" aria-hidden="true" />
+        </Button>
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={() => setIsLooping((looping) => !looping)}
+          disabled={!selectedClip}
+          aria-label="Repetir animación LSB"
+          aria-pressed={isLooping}
+        >
+          <Repeat size={16} aria-hidden="true" />
+        </Button>
+        <span className="playback-time">
+          {selectedClip
+            ? `${formatTime(currentTime)} / ${formatTime(duration)}`
+            : "Sin clip"}
+        </span>
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={() => void previewRef.current?.requestFullscreen?.()}
+          aria-label="Pantalla completa del avatar"
+        >
           <Maximize size={16} aria-hidden="true" />
         </Button>
         <Button
           size="icon"
           variant="ghost"
           onClick={() => inputRef.current?.click()}
-          aria-label={modelUrl ? "Cambiar modelo GLB local" : "Probar modelo GLB local, máximo 25 MB"}
-          title={modelUrl ? "Cambiar modelo GLB local" : "Probar modelo GLB local, máximo 25 MB"}
+          aria-label={
+            hasModel
+              ? "Cambiar modelo GLB local"
+              : "Probar modelo GLB local, máximo 25 MB"
+          }
+          title={
+            hasModel
+              ? "Cambiar modelo GLB local"
+              : "Probar modelo GLB local, máximo 25 MB"
+          }
           aria-describedby="avatar-upload-help"
         >
           <Upload size={15} aria-hidden="true" />
@@ -154,18 +281,23 @@ export function AvatarPreview() {
         aria-label="Seleccionar modelo 3D GLB"
         aria-describedby="avatar-upload-help"
       />
-      <span className="sr-only" id="avatar-upload-help">El modelo se procesa solo en este navegador. El archivo debe ser .glb y pesar hasta 25 MB.</span>
-      {modelUrl ? (
+      <span className="sr-only" id="avatar-upload-help">
+        El modelo se procesa solo en este navegador. El archivo debe ser .glb y
+        pesar hasta 25 MB.
+      </span>
+      {hasModel ? (
         <div className="avatar-model-tools">
-          <label className="field-label" htmlFor="avatar-animation">Animación del modelo</label>
-          <select id="avatar-animation" className="native-select" value={selectedClip} disabled={clips.length === 0} onChange={(event) => setSelectedClip(event.currentTarget.value)}>
-            {clips.length ? clips.map((clip) => <option key={clip} value={clip}>{clip}</option>) : <option value="">Sin clips disponibles</option>}
-          </select>
-          {clips.length === 0 ? <p className="help-text">El GLB no contiene animaciones. Puedes girar el modelo con mouse o pantalla táctil.</p> : null}
-          <p className="model-name">Modelo local: {modelName}</p>
+          <p className="model-name">Modelo: {modelName || "configurado"}</p>
+          {clips.length === 0 ? (
+            <p className="help-text">El GLB no contiene animaciones.</p>
+          ) : null}
         </div>
       ) : null}
-      {fileError ? <p className="field-error" role="alert">{fileError}</p> : null}
+      {fileError ? (
+        <p className="field-error" role="alert">
+          {fileError}
+        </p>
+      ) : null}
     </section>
   );
 }

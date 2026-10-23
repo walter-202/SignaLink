@@ -13,7 +13,9 @@ interface AvatarSceneProps {
   isPlaying: boolean;
   isLooping: boolean;
   speed: number;
+  restartToken?: number;
   onAnimationsLoaded: (names: string[]) => void;
+  onClipDurations?: (durations: Record<string, number>) => void;
   onPlaybackEnded: () => void;
 }
 
@@ -28,9 +30,12 @@ function LoadingFigure() {
 
 export default function AvatarScene(props: AvatarSceneProps) {
   const { onAnimationsLoaded } = props;
-  const handleAnimationsLoaded = useCallback((animations: AnimationClip[]) => {
-    onAnimationsLoaded(animations.map((animation) => animation.name));
-  }, [onAnimationsLoaded]);
+  const handleAnimationsLoaded = useCallback(
+    (animations: AnimationClip[]) => {
+      onAnimationsLoaded(animations.map((animation) => animation.name));
+    },
+    [onAnimationsLoaded],
+  );
 
   return (
     <Canvas
@@ -38,13 +43,25 @@ export default function AvatarScene(props: AvatarSceneProps) {
       dpr={[1, 1.5]}
       camera={{ position: [0, 1.55, 4.8], fov: 34, near: 0.1, far: 50 }}
       gl={{ antialias: true, alpha: true, powerPreference: "low-power" }}
-      fallback={<p className="scene-state">Este dispositivo no puede abrir el visor 3D.</p>}
+      fallback={
+        <p className="scene-state">
+          Este dispositivo no puede abrir el visor 3D.
+        </p>
+      }
     >
       <color attach="background" args={["#edf5f3"]} />
       <ambientLight intensity={1.6} />
       <directionalLight position={[3, 5, 4]} intensity={2.1} />
-      <directionalLight position={[-3, 2, -2]} intensity={0.8} color="#a7d6cc" />
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.025, 0]} receiveShadow>
+      <directionalLight
+        position={[-3, 2, -2]}
+        intensity={0.8}
+        color="#a7d6cc"
+      />
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, -0.025, 0]}
+        receiveShadow
+      >
         <circleGeometry args={[2.2, 64]} />
         <meshStandardMaterial color="#dcebe7" roughness={0.92} />
       </mesh>
@@ -57,10 +74,14 @@ export default function AvatarScene(props: AvatarSceneProps) {
             isPlaying={props.isPlaying}
             isLooping={props.isLooping}
             speed={props.speed}
+            restartToken={props.restartToken}
             onAnimationsLoaded={handleAnimationsLoaded}
+            onClipDurations={props.onClipDurations}
             onPlaybackEnded={props.onPlaybackEnded}
           />
-        ) : <ProvisionalAvatar />}
+        ) : (
+          <ProvisionalAvatar />
+        )}
       </Suspense>
       <OrbitControls
         makeDefault

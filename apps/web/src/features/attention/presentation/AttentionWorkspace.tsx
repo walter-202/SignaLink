@@ -8,6 +8,7 @@ import { Select } from "@/components/ui/Select";
 import { StatusIndicator } from "@/components/feedback/StatusIndicator";
 import { useAttentionStore } from "@/features/attention/application/attention-store";
 import { useCamera } from "@/features/camera";
+import { LsbExpressionPanel, type LsbExpression } from "@/features/lsb-catalog";
 import { formatProcedureDateTime } from "@/features/procedure-history/application/filter-history";
 import { AvatarPreview } from "./components/AvatarPreview";
 import { CameraPanel } from "./components/CameraPanel";
@@ -26,6 +27,7 @@ export function AttentionWorkspace() {
   const [confirmFinishOpen, setConfirmFinishOpen] = useState(false);
   const [procedureInfoOpen, setProcedureInfoOpen] = useState(false);
   const [toast, setToast] = useState("");
+  const [lsbExpression, setLsbExpression] = useState<LsbExpression | null>(null);
   const responseRef = useRef<HTMLTextAreaElement>(null);
   const records = useAttentionStore((state) => state.records);
   const isReady = useAttentionStore((state) => state.isReady);
@@ -35,6 +37,7 @@ export function AttentionWorkspace() {
   const activeRecordId = useAttentionStore((state) => state.activeRecordId);
   const procedureType = useAttentionStore((state) => state.procedureType);
   const setProcedureType = useAttentionStore((state) => state.setProcedureType);
+  const draft = useAttentionStore((state) => state.draft);
   const notes = useAttentionStore((state) => state.notes);
   const notesError = useAttentionStore((state) => state.notesError);
   const notesDirty = useAttentionStore((state) => state.notesDirty);
@@ -151,7 +154,8 @@ export function AttentionWorkspace() {
         </div>
         <aside className="attention-column attention-column--response" aria-label="Respuesta y datos del trámite">
           <ResponseComposer textareaRef={responseRef} />
-          <AvatarPreview />
+          <LsbExpressionPanel draft={draft} onResolved={setLsbExpression} />
+          <AvatarPreview expression={lsbExpression} />
           <section className="panel-card procedure-info-card" aria-labelledby="procedure-info-title">
             <header className="compact-card-heading">
               <div className="inline-title"><ShieldCheck size={17} aria-hidden="true" /><h2 id="procedure-info-title">Datos del trámite</h2></div>

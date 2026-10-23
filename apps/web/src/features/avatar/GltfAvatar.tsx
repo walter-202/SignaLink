@@ -4,7 +4,13 @@
 
 import { useAnimations, useGLTF } from "@react-three/drei";
 import { useEffect, useMemo, useRef } from "react";
-import { LoopOnce, LoopRepeat, type AnimationAction, type AnimationClip, type Group } from "three";
+import {
+  LoopOnce,
+  LoopRepeat,
+  type AnimationAction,
+  type AnimationClip,
+  type Group,
+} from "three";
 import { clone } from "three/addons/utils/SkeletonUtils.js";
 
 interface GltfAvatarProps {
@@ -13,11 +19,16 @@ interface GltfAvatarProps {
   isPlaying: boolean;
   isLooping: boolean;
   speed: number;
+  restartToken?: number;
   onAnimationsLoaded: (animations: AnimationClip[]) => void;
+  onClipDurations?: (durations: Record<string, number>) => void;
   onPlaybackEnded: () => void;
 }
 
-function setActionPaused(action: AnimationAction | null | undefined, paused: boolean) {
+function setActionPaused(
+  action: AnimationAction | null | undefined,
+  paused: boolean,
+) {
   if (!action) return;
   action.paused = paused;
 }
@@ -28,7 +39,9 @@ export default function GltfAvatar({
   isPlaying,
   isLooping,
   speed,
+  restartToken,
   onAnimationsLoaded,
+  onClipDurations,
   onPlaybackEnded,
 }: GltfAvatarProps) {
   const root = useRef<Group>(null);
@@ -40,19 +53,31 @@ export default function GltfAvatar({
 
   useEffect(() => {
     onAnimationsLoaded(gltf.animations);
-  }, [gltf.animations, onAnimationsLoaded]);
+    onClipDurations?.(
+      Object.fromEntries(
+        gltf.animations.map((animation) => [
+          animation.name,
+          animation.duration,
+        ]),
+      ),
+    );
+  }, [gltf.animations, onAnimationsLoaded, onClipDurations]);
+
+  useEffect(() => {
+    if (!action) return;
+    action.clampWhenFinished = !isLooping;
+    action.setLoop(isLooping ? LoopRepeat : LoopOnce, isLooping ? Infinity : 1);
+  }, [action, isLooping]);
 
   useEffect(() => {
     if (!action) return;
     action.reset();
-    action.clampWhenFinished = !isLooping;
-    action.setLoop(isLooping ? LoopRepeat : LoopOnce, isLooping ? Infinity : 1);
     action.play();
     setActionPaused(action, !isPlayingRef.current);
     return () => {
       action.stop();
     };
-  }, [action, isLooping]);
+  }, [action, restartToken]);
 
   useEffect(() => {
     isPlayingRef.current = isPlaying;

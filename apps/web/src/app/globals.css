@@ -566,6 +566,24 @@ h1, h2, h3, p { margin-top: 0; }
 .frequent-phrases button { border: 0; border-radius: 6px; background: transparent; color: #344054; cursor: pointer; padding: 0.5rem; font-size: 0.67rem; line-height: 1.35; text-align: left; }
 .frequent-phrases button:hover, .frequent-phrases button:focus-visible { background: #edf8f8; }
 .composer-notice { margin: 0; color: #345e66; font-size: 0.66rem; line-height: 1.4; }
+.lsb-catalog-card { display: grid; gap: 8px; padding: 11px; }
+.lsb-lookup { display: grid; gap: 5px; }
+.lsb-actions { display: flex; flex-wrap: wrap; gap: 5px; }
+.lsb-actions .ui-button { min-height: 31px; }
+.lsb-result { display: grid; gap: 7px; border: 1px solid var(--line); border-radius: 8px; background: #f8fbfb; padding: 9px; }
+.lsb-result-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.lsb-result-heading strong { color: var(--ink); font-size: 0.82rem; }
+.lsb-result-badge { border-radius: 99px; background: var(--success-soft); color: #15803d; padding: 0.22rem 0.42rem; font-size: 0.56rem; font-weight: 720; text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; }
+.lsb-facts { display: grid; gap: 0; margin: 0; }
+.lsb-facts > div { display: flex; justify-content: space-between; gap: 0.5rem; border-bottom: 1px solid #eef2f4; padding: 0.2rem 0; }
+.lsb-facts > div:last-child { border-bottom: 0; }
+.lsb-facts dt { color: var(--muted); font-size: 0.63rem; }
+.lsb-facts dd { margin: 0; color: #25324b; font-size: 0.63rem; font-weight: 600; text-align: right; }
+.lsb-catalog-toggle { justify-self: start; border: 0; background: transparent; color: var(--brand); padding: 0.15rem 0; cursor: pointer; font-size: 0.66rem; font-weight: 650; text-align: left; }
+.lsb-catalog-toggle:hover, .lsb-catalog-toggle:focus-visible { text-decoration: underline; }
+.lsb-catalog-card .frequent-phrases button { display: flex; justify-content: space-between; gap: 8px; }
+.lsb-catalog-source { color: var(--subtle); font-size: 0.6rem; white-space: nowrap; }
+.avatar-expression-note { margin: 0; border-radius: 7px; background: var(--info-soft); color: #1e3a8a; padding: 6px 8px; font-size: 0.64rem; line-height: 1.4; }
 .send-response-button { min-height: 31px; padding-right: 0.6rem; padding-left: 0.6rem; }
 
 .avatar-preview-card { display: grid; gap: 8px; }
