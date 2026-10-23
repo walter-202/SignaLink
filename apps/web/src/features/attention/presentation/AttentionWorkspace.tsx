@@ -185,7 +185,7 @@ export function AttentionWorkspace() {
         </aside>
       </div>
 
-      <p className="prototype-note"><strong>Revisión humana:</strong> la propuesta de señas todavía es demostrativa; confirma o corrige el texto antes de guardarlo. La cámara y sus imágenes no se almacenan.</p>
+      <p className="prototype-note"><strong>Revisión humana:</strong> el modelo de referencia solo propone etiquetas de un vocabulario limitado y aún no está validado como traductor LSB. Confirma o corrige cada propuesta antes de guardarla; la cámara y sus imágenes no se almacenan.</p>
       <div className="sr-only" role="status" aria-live="polite">{toast}</div>
 
       <Dialog

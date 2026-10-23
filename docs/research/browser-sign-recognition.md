@@ -1,6 +1,14 @@
 # Reconocimiento de LSB en el navegador: investigación inicial
 
-- **Fecha:** 2026-10-22
+## Estado actual del prototipo
+
+El clasificador base ya se puede seleccionar en Ajustes de captura. Al elegirlo se cargan el modelo ONNX de 6.87 MiB y el runtime WASM local (13.6 MiB); se verifica el SHA-256, se recogen 30 frames y se propone una etiqueta editable. El umbral actual de 0.50 se hereda del upstream y no está calibrado. El resultado siempre exige revisión humana.
+
+El WASM de ONNX Runtime Web se copia desde la versión exacta fijada en `pnpm-lock.yaml` a `apps/web/public/onnxruntime/wasm/` antes de iniciar Next o construir. Esa carpeta es generada e ignorada por Git. El modelo, la tarjeta informativa y la licencia del upstream viven en `apps/web/public/models/lsb-reference-v4/`.
+
+Esto confirma la ruta técnica de carga/inferencia, no la calidad de reconocimiento. A 15 FPS, la ventana de 30 frames tarda como mínimo unos 2 segundos y aún falta evaluar la paridad de landmarks Python/Web, el comportamiento por clase y el rendimiento móvil. Para comparar otras opciones y priorizar un reconocedor LSB fluido, consulta [`sign-model-options.md`](./sign-model-options.md).
+
+- **Fecha:** 2026-10-23 (actualizado)
 - **Alcance:** landmarks, inferencia local y viabilidad de WebGPU
 - **Decisión relacionada:** `docs/architecture/adr/ADR-001-browser-only-sign-pipeline.md`
 

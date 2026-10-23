@@ -7,7 +7,7 @@
 
 ## Contexto
 
-La PWA necesita reconocer señas de LSB durante una atención presencial sin enviar video, audio ni landmarks a un servidor. El prototipo actual ya captura video localmente, pero la interpretación sigue siendo simulada. La primera etapa debe producir landmarks corporales y una representación temporal compatible con un clasificador intercambiable.
+La PWA necesita apoyar la comunicación en LSB durante una atención presencial sin enviar video, audio ni landmarks a un servidor. La cámara y la extracción de landmarks ya funcionan en el navegador; se integra un clasificador experimental para producir etiquetas de un vocabulario acotado.
 
 Existen tres restricciones que condicionan la solución:
 
@@ -35,8 +35,8 @@ Etiqueta candidata + puntuación + estado de revisión
 
 ### Estado de implementación
 
-- **Implementado:** carga diferida de `HolisticLandmarker`, overlay de pose/manos, extracción pura de las 138 features, provider de sesión, hook con throttling y estados de carga/error, y control opcional en la UI.
-- **Pendiente:** buffer de 30 fotogramas, adaptador ONNX Runtime Web, catálogo de etiquetas, umbral de abstención y evaluación de paridad con Python.
+- **Implementado:** carga diferida de `HolisticLandmarker`, overlay de pose/manos, extracción de 138 features, buffer explícito de 30 fotogramas, carga opcional del ONNX LSB v4, ejecución local con WASM, SHA-256 del artefacto, etiquetas, umbral inicial de abstención y borrador revisable.
+- **Pendiente:** verificar paridad de features con secuencias autorizadas, medir tiempo/memoria en equipos objetivo, calibrar la abstención con datos representativos, mover inferencia a worker si el perfil lo requiere, y diseñar reconocimiento continuo.
 
 ### Landmarks
 
@@ -62,18 +62,19 @@ La extracción debe ser una función pura, probada con fixtures y separada del a
 ### Clasificador
 
 - Usar ONNX Runtime Web para el modelo de secuencia.
-- Preferir el execution provider WebGPU y usar WASM como fallback.
+- Usar WASM para el modelo pequeño de referencia y medir el pipeline completo antes de añadir WebGPU; ONNX Runtime recomienda comparar por carga y dispositivo.
 - No importar ONNX, MediaPipe ni tensores desde componentes React.
-- La ventana inicial es de 30 fotogramas. La primera integración puede clasificar una ventana completa; el reconocimiento continuo con segmentación o CTC se pospone.
-- El adaptador devuelve etiqueta, puntuación y estado de incertidumbre. No convierte la puntuación en un porcentaje de confianza sin calibrar.
-- El modelo candidato inicial es `model_transformer_enco_v4.onnx` de Villca Villegas (MIT), sujeto a verificación de hash, licencia y paridad de preprocesamiento.
+- La ventana inicial es de 30 fotogramas (~2 s a 15 FPS). Se clasifica una ventana por captura; la segmentación y el reconocimiento continuo se posponen.
+- El adaptador devuelve etiqueta y puntuación softmax; el UI la llama “puntuación”, no confianza calibrada. El umbral de 0.50 es heredado de la demo upstream, no validado para uso general.
+- El modelo `model_transformer_enco_v4.onnx` de Villca Villegas está versionado con SHA-256 y atribución MIT en `apps/web/public/models/lsb-reference-v4/`. El repo no documenta por separado la procedencia/licencia del corpus y no publica latencia web.
+- ONNX Runtime Web se importa solo si el personal selecciona ese modelo. El `.wasm` de 13.6 MiB y el `.mjs` se copian al `public/` ignorado desde la versión fijada del paquete antes de dev/build; el modelo pesa 6.9 MiB. Así no depende de jsDelivr y ambos pueden quedar en caché del mismo origen.
 
 ### Privacidad y persistencia
 
 - El video y los landmarks no se envían a Supabase ni a un endpoint propio.
 - No se guardan grabaciones por defecto.
 - Supabase se reserva para catálogo de modelos, manifiestos aprobados, contenido LSB y, más adelante, sesiones con política de retención y RLS definidas.
-- La UI debe indicar que el procesamiento es local y que el resultado es una demostración.
+- La UI indica procesamiento local, alcance experimental y revisión humana antes de guardar.
 
 ## Alternativas consideradas
 
@@ -108,8 +109,8 @@ No bloquea el prototipo. Primero se valida el contrato de landmarks y el adaptad
 
 ### Costos y riesgos
 
-- La descarga inicial incluye el bundle de MediaPipe (aproximadamente 13.7 MB) y, más adelante, el modelo de secuencia (aproximadamente 7.2 MB). Se necesita caché y estados de carga claros.
-- WebGPU no está disponible en todos los navegadores y dispositivos; el fallback WASM puede ser más lento.
+- Primer uso del clasificador descarga aproximadamente 6.9 MiB de modelo y 13.6 MiB de runtime WASM; el modelo se carga de forma explícita y los recursos locales pueden quedar en caché.
+- La ventana de captura por sí sola ocupa ~2 segundos a 15 FPS, antes de contar la inferencia; no garantiza conversación fluida.
 - El modelo de referencia cubre 58 clases y condiciones de captura limitadas; no representa LSB general ni traducción libre.
 - La paridad entre MediaPipe Python y MediaPipe Web debe verificarse con fixtures antes de confiar en las predicciones.
 - El procesamiento en el hilo principal puede afectar la UI; se debe medir y migrar a worker si es necesario.
@@ -118,10 +119,10 @@ No bloquea el prototipo. Primero se valida el contrato de landmarks y el adaptad
 ## Fases
 
 1. **Landmarks locales:** cargar Holistic, dibujar overlay, extraer las 138 features y exponer estado/errores.
-2. **Clasificador aislado:** integrar ONNX Runtime Web, ventana de 30 fotogramas y etiquetas candidatas.
+2. **Clasificador aislado (baseline implementado):** carga explícita del ONNX local, ventana de 30 fotogramas y etiquetas candidatas.
 3. **Evaluación:** benchmark por clase y participante, latencia, memoria y paridad con Python.
-4. **Continuo:** segmentación, ventana deslizante, marcadores no manuales y abstención.
-5. **Registro:** manifiesto, hash, licencia y catálogo Supabase antes de habilitar un modelo en producción.
+4. **Continuo:** segmentación, ventanas consistentes, marcadores no manuales y abstención calibrada.
+5. **Modelo LSB propio:** corpus autorizado y entrenamiento/comparación TCN vs. GRU; catálogo versionado después de validar licencia y métricas.
 
 ## Criterios de aceptación
 

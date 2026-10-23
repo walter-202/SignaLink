@@ -109,6 +109,7 @@ export function AvatarPreview() {
           <Image
             width={800}
             height={800}
+            loading="eager"
             src="/images/avatar-demo.png"
             alt="Avatar 3D de demostración en una pose neutra; la imagen no muestra una seña LSB validada"
           />

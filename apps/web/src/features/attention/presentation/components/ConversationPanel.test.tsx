@@ -25,6 +25,8 @@ function resetStore() {
     procedureType: "Registro ciudadano",
     captureStatus: "idle",
     captureText: "",
+    captureScore: null,
+    captureProgress: 0,
     captureError: null,
     failNextRecognition: false,
     draft: "",
@@ -68,5 +70,19 @@ describe("ConversationPanel", () => {
     await user.click(screen.getByRole("button", { name: "Reintentar" }));
     await waitFor(() => expect(useAttentionStore.getState().captureStatus).toBe("reviewing"));
     expect(screen.getByRole("textbox", { name: "Editar propuesta" })).toBeInTheDocument();
+  });
+
+  it("shows an experimental model result as an editable candidate with an uncalibrated score", async () => {
+    act(() => {
+      useAttentionStore.getState().beginModelCapture();
+      useAttentionStore.getState().setCaptureProgress(30);
+      useAttentionStore.getState().setCaptureProcessing();
+      useAttentionStore.getState().completeModelCapture("HOLA", 0.87);
+    });
+    render(<ConversationPanel onRespond={() => undefined} onUseSigns={() => undefined} />);
+
+    expect(screen.getByRole("textbox", { name: "Editar propuesta" })).toHaveValue("HOLA");
+    expect(screen.getByText(/puntuación softmax 87.0% \(no calibrada\)/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
   });
 });

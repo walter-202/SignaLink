@@ -22,6 +22,8 @@ interface AttentionState {
   procedureType: string;
   captureStatus: CaptureStatus;
   captureText: string;
+  captureScore: number | null;
+  captureProgress: number;
   captureError: string | null;
   failNextRecognition: boolean;
   draft: string;
@@ -38,6 +40,10 @@ interface AttentionState {
   loadRecords: () => Promise<void>;
   clearSyncError: () => void;
   startCapture: () => Promise<void>;
+  beginModelCapture: () => void;
+  setCaptureProgress: (progress: number) => void;
+  setCaptureProcessing: () => void;
+  completeModelCapture: (captureText: string, score: number) => void;
   cancelCapture: () => void;
   confirmCapture: () => Promise<void>;
   setCaptureText: (value: string) => void;
@@ -88,6 +94,8 @@ export const useAttentionStore = create<AttentionState>((set, get) => ({
   procedureType: "Registro ciudadano",
   captureStatus: "idle",
   captureText: "",
+  captureScore: null,
+  captureProgress: 0,
   captureError: null,
   failNextRecognition: false,
   draft: "",
@@ -138,6 +146,8 @@ export const useAttentionStore = create<AttentionState>((set, get) => ({
       captureStatus: "capturing",
       captureError: null,
       captureText: "",
+      captureScore: null,
+      captureProgress: 0,
       failNextRecognition: false,
       mode: "capture",
     });
@@ -162,9 +172,40 @@ export const useAttentionStore = create<AttentionState>((set, get) => ({
     }
   },
 
+  beginModelCapture: () => {
+    if (getRecord(get())?.status !== "active") return;
+    captureAttempt += 1;
+    set({
+      captureStatus: "capturing",
+      captureText: "",
+      captureScore: null,
+      captureProgress: 0,
+      captureError: null,
+      mode: "capture",
+    });
+  },
+
+  setCaptureProgress: (captureProgress) => {
+    set({ captureProgress: Math.min(30, Math.max(0, Math.floor(captureProgress))) });
+  },
+
+  setCaptureProcessing: () => {
+    if (get().captureStatus === "capturing") set({ captureStatus: "processing" });
+  },
+
+  completeModelCapture: (captureText, captureScore) => {
+    if (get().captureStatus !== "processing") return;
+    set({
+      captureStatus: "reviewing",
+      captureText,
+      captureScore,
+      captureError: null,
+    });
+  },
+
   cancelCapture: () => {
     captureAttempt += 1;
-    set({ captureStatus: "idle", captureText: "", captureError: null });
+    set({ captureStatus: "idle", captureText: "", captureScore: null, captureProgress: 0, captureError: null });
   },
 
   confirmCapture: async () => {
@@ -198,7 +239,7 @@ export const useAttentionStore = create<AttentionState>((set, get) => ({
     await get().startCapture();
   },
 
-  clearCapture: () => set({ captureStatus: "idle", captureText: "", captureError: null }),
+  clearCapture: () => set({ captureStatus: "idle", captureText: "", captureScore: null, captureProgress: 0, captureError: null }),
   setFailNextRecognition: (enabled) => set({ failNextRecognition: enabled }),
   setDraft: (draft) => set({ draft, draftError: null }),
 
@@ -304,6 +345,8 @@ export const useAttentionStore = create<AttentionState>((set, get) => ({
         records: replaceRecord(current.records, record.id, (item) => ({ ...item, status: "completed", durationMinutes })),
         captureStatus: "idle",
         captureText: "",
+        captureScore: null,
+        captureProgress: 0,
         captureError: null,
         syncError: null,
       }));
@@ -326,6 +369,8 @@ export const useAttentionStore = create<AttentionState>((set, get) => ({
         procedureType: record.procedureType,
         captureStatus: "idle",
         captureText: "",
+        captureScore: null,
+        captureProgress: 0,
         captureError: null,
         draft: "",
         draftError: null,
@@ -359,6 +404,8 @@ export const useAttentionStore = create<AttentionState>((set, get) => ({
         notesDirty: false,
         captureStatus: "idle",
         captureText: "",
+        captureScore: null,
+        captureProgress: 0,
         captureError: null,
         draft: "",
         draftError: null,

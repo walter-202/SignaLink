@@ -31,6 +31,8 @@ function resetStore() {
     procedureType: "Registro ciudadano",
     captureStatus: "idle",
     captureText: "",
+    captureScore: null,
+    captureProgress: 0,
     captureError: null,
     failNextRecognition: false,
     draft: "",

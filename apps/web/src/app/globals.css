@@ -490,6 +490,12 @@ h1, h2, h3, p { margin-top: 0; }
 .camera-disclaimer { display: flex; align-items: flex-start; gap: 0.35rem; margin: 0; border-top: 1px solid var(--line); padding-top: 10px; color: var(--subtle); font-size: 0.65rem; line-height: 1.45; }
 .camera-disclaimer > svg { flex: 0 0 auto; margin-top: 1px; color: var(--brand); }
 .camera-settings-block { display: grid; gap: 6px; margin-bottom: 16px; border-bottom: 1px solid var(--line); padding-bottom: 16px; }
+.camera-model-status, .camera-model-error { margin: -3px 0 0; border-radius: 7px; padding: 0.42rem 0.55rem; font-size: 0.64rem; line-height: 1.4; }
+.camera-model-status { background: #e8f7f5; color: #08715f; }
+.camera-model-error { background: #fff4f1; color: #a42a1a; }
+.camera-model-load-state { display: grid; gap: 5px; }
+.camera-model-load-state p { margin: 0; }
+.camera-model-load-state a { color: var(--brand-strong); font-weight: 650; text-decoration: underline; text-underline-offset: 2px; }
 
 .conversation-panel { display: flex; min-height: 100%; flex-direction: column; padding: 12px; }
 .conversation-heading { min-height: 28px; margin-bottom: 0.55rem; }

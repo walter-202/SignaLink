@@ -11,3 +11,4 @@ work/
 .env.*
 !.env.example
 /apps/web/public/mediapipe/wasm/
+/apps/web/public/onnxruntime/wasm/

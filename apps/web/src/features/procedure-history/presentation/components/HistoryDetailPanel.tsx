@@ -96,7 +96,7 @@ export function HistoryDetailPanel({ record, onReopen }: HistoryDetailPanelProps
         <ol className="dialog-conversation-list">
           {record.messages.map((message) => (
             <li className={message.sender === "staff" ? "dialog-message dialog-message--staff" : "dialog-message"} key={message.id}>
-              <strong>{message.sender === "citizen" ? "Persona usuaria · LSB → Español (demo)" : "Personal de atención · texto"}</strong>
+              <strong>{message.sender === "citizen" ? "Persona usuaria · propuesta de seña revisada" : "Personal de atención · texto"}</strong>
               <p>{message.text}</p>
               <time>{message.time}</time>
             </li>

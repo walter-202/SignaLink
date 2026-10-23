@@ -1,0 +1,22 @@
+{
+  "id": "lsb-reference-v4",
+  "name": "model_transformer_enco_v4.onnx",
+  "language": "Lengua de Señas Boliviana (LSB)",
+  "task": "Clasificación de secuencias aisladas",
+  "input": {
+    "name": "input",
+    "shape": [1, 30, 138],
+    "dtype": "float32"
+  },
+  "classes": 58,
+  "trainingSequences": 5800,
+  "sha256": "976cc4071de03c4deea46f1219e3cf98ad779c17df12148152f64b704f957ee2",
+  "source": "https://github.com/freddxvill/Proyecto_Traductor_de_la_LSB",
+  "license": "MIT",
+  "limits": [
+    "El upstream no publica evaluación por signante ni latencia de navegador.",
+    "No es traducción continua ni cubre la gramática general de LSB.",
+    "El puntaje softmax no está calibrado; toda etiqueta requiere revisión humana.",
+    "La licencia MIT está declarada en el repositorio; la procedencia/licencia de los datos no se documenta por separado."
+  ]
+}
