@@ -23,8 +23,8 @@ import { useAttentionStore } from "@/features/attention/application/attention-st
 import { createClient } from "@/lib/supabase/client";
 
 const navigation = [
-  { href: "/atender", label: "Atención", icon: Hand },
-  { href: "/historial", label: "Historial", icon: History },
+  { href: "/atender", label: "Atención", description: "Señas y respuestas", icon: Hand },
+  { href: "/historial", label: "Historial", description: "Atenciones guardadas", icon: History },
 ];
 
 export default function AppShell({ children }: { children: ReactNode }) {
@@ -126,18 +126,29 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <div className={`workspace-layout ${collapsed ? "workspace-layout--collapsed" : ""}`}>
         <aside className={`sidebar ${collapsed ? "sidebar--collapsed" : ""} ${mobileOpen ? "sidebar--mobile-open" : ""}`} aria-label="Navegación principal">
           <div className="sidebar-topline">
+            <span className="sidebar-topline-label">Navegación</span>
             <button
               className="icon-button sidebar-collapse-button"
               type="button"
               onClick={() => setCollapsed((value) => !value)}
               aria-label={collapsed ? "Expandir menú" : "Contraer menú"}
+              aria-expanded={!collapsed}
+              aria-controls="primary-navigation"
               title={collapsed ? "Expandir menú" : "Contraer menú"}
             >
               {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
             </button>
+            <button
+              className="icon-button sidebar-mobile-close"
+              type="button"
+              onClick={() => setMobileOpen(false)}
+              aria-label="Cerrar menú"
+            >
+              <X size={18} aria-hidden="true" />
+            </button>
           </div>
-          <nav className="sidebar-navigation">
-            {navigation.map(({ href, label, icon: Icon }) => {
+          <nav className="sidebar-navigation" id="primary-navigation" aria-label="Secciones">
+            {navigation.map(({ href, label, description, icon: Icon }) => {
               const current = pathname === href;
               return (
                 <Link
@@ -149,17 +160,19 @@ export default function AppShell({ children }: { children: ReactNode }) {
                   title={collapsed ? label : undefined}
                   onClick={() => setMobileOpen(false)}
                 >
-                  <Icon size={18} aria-hidden="true" />
-                  <span>{label}</span>
+                  <span className="navigation-icon"><Icon size={20} aria-hidden="true" /></span>
+                  <span className="navigation-copy">
+                    <span className="navigation-label">{label}</span>
+                    <span className="navigation-description">{description}</span>
+                  </span>
                 </Link>
               );
             })}
           </nav>
           <div className="sidebar-spacer" />
-          <div className="sidebar-decoration" aria-hidden="true" />
           <div className="sidebar-footer">
-            <MapPin className="sidebar-region-icon" size={17} aria-hidden="true" />
-            <span><strong>LSB · Bolivia</strong><small>APP accesible</small></span>
+            <span className="sidebar-footer-icon"><MapPin size={17} aria-hidden="true" /></span>
+            <span className="sidebar-footer-copy"><strong>LSB · Bolivia</strong><small>Atención accesible</small></span>
           </div>
         </aside>
         {mobileOpen ? (
