@@ -63,9 +63,12 @@ function expression(overrides: Partial<LsbExpression> = {}): LsbExpression {
   };
 }
 
-async function renderPreview(value?: LsbExpression | null) {
+async function renderPreview(
+  value?: LsbExpression | null,
+  autoStart = false,
+) {
   const { AvatarPreview } = await import("./AvatarPreview");
-  return render(<AvatarPreview expression={value} />);
+  return render(<AvatarPreview expression={value} autoStart={autoStart} />);
 }
 
 beforeEach(() => {
@@ -123,6 +126,20 @@ describe("AvatarPreview", () => {
     expect(
       screen.getByText(/Modelo:\s*Avatar demostrativo/),
     ).toBeInTheDocument();
+  });
+
+  it("automatically loads the exact catalog clip when requested by the response", async () => {
+    await renderPreview(expression(), true);
+
+    await screen.findByTestId("scene");
+    await waitFor(() => {
+      expect(screen.getByTestId("scene")).toHaveAttribute(
+        "data-animation",
+        "Armature|HOLA",
+      );
+      expect(screen.getByTestId("scene")).toHaveAttribute("data-playing", "true");
+    });
+    expect(screen.getByText("Vista 3D de respuesta")).toBeInTheDocument();
   });
 
   it("formats durations longer than a minute as minutes and seconds", async () => {
@@ -202,7 +219,7 @@ describe("AvatarPreview", () => {
     await renderPreview();
     expect(screen.queryByTestId("scene")).not.toBeInTheDocument();
     expect(
-      screen.getByText(/Selecciona una expresión del catálogo/),
+      screen.getByText(/Escribe una expresión exacta del catálogo/),
     ).toBeInTheDocument();
   });
 
