@@ -15,3 +15,11 @@ export type {
   LandmarkDetector,
   LandmarkDetectorErrorCode,
 } from "./application/ports/landmark-detector";
+export {
+  ContinuousSignSegmenter,
+  measureHandMotion,
+} from "./application/continuous-sign-segmenter";
+export type {
+  ContinuousSignSegmenterOptions,
+  ContinuousSignSegmenterUpdate,
+} from "./application/continuous-sign-segmenter";

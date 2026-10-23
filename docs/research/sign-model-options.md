@@ -2,9 +2,9 @@
 
 ## Recomendación
 
-Integrar `model_transformer_enco_v4.onnx` como baseline de **clasificación aislada LSB**. Mantener el resultado editable y sujeto a confirmación humana. No presentarlo como traductor ni como reconocimiento fluido: recoge 30 fotogramas (aprox. 2 s a 15 FPS) y devuelve una de 58 etiquetas. La captura, MediaPipe, el modelo y ONNX Runtime se ejecutan en el navegador.
+Integrar `model_transformer_enco_v4.onnx` como baseline de **clasificación aislada LSB**. Mantener el resultado editable y sujeto a confirmación humana. No presentarlo como traductor ni como reconocimiento fluido: recibe segmentos de 30 fotogramas (aprox. 1 s a 30 FPS) y devuelve una de 58 etiquetas. La app segmenta por movimiento, acumula etiquetas en un borrador y exige confirmar cada frase. La captura, MediaPipe, el modelo y ONNX Runtime se ejecutan en el navegador.
 
-El artefacto de upstream mide 7,206,466 bytes (6.87 MiB). El runtime WASM de ONNX Runtime Web 1.30.0 añade un archivo de aproximadamente 13.6 MiB en el primer uso; los siguientes usos pueden reutilizar la caché HTTP del navegador. La UI carga ambos solo tras seleccionar el modelo experimental. El resto del MVP funciona con la demo y el teclado aunque falle esa descarga.
+El artefacto de upstream mide 7,206,466 bytes (6.87 MiB). El runtime WASM de ONNX Runtime Web 1.30.0 añade un archivo de aproximadamente 13.6 MiB en el primer uso; los siguientes usos pueden reutilizar la caché HTTP del navegador. La UI carga ambos automáticamente al abrir la vista de atención, incluso si la captura aún no se inició. El teclado y el dictado siguen disponibles aunque falle esa descarga.
 
 ## Opciones revisadas
 

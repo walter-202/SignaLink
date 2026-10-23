@@ -2,11 +2,11 @@
 
 ## Estado actual del prototipo
 
-El clasificador base ya se puede seleccionar en Ajustes de captura. Al elegirlo se cargan el modelo ONNX de 6.87 MiB y el runtime WASM local (13.6 MiB); se verifica el SHA-256, se recogen 30 frames y se propone una etiqueta editable. El umbral actual de 0.50 se hereda del upstream y no está calibrado. El resultado siempre exige revisión humana.
+El clasificador base se carga automáticamente al abrir la atención. Se descargan el modelo ONNX de 6.87 MiB y el runtime WASM local (13.6 MiB), se verifica el SHA-256 y se habilitan los controles cuando cámara, landmarks y modelo están listos. El modo continuo segmenta por movimiento, recoge 30 frames a intervalos de 33 ms y propone una etiqueta editable por segmento. El umbral actual de 0.50 se hereda del upstream y no está calibrado. El resultado siempre exige revisión y confirmación humana.
 
 El WASM de ONNX Runtime Web se copia desde la versión exacta fijada en `pnpm-lock.yaml` a `apps/web/public/onnxruntime/wasm/` antes de iniciar Next o construir. Esa carpeta es generada e ignorada por Git. El modelo, la tarjeta informativa y la licencia del upstream viven en `apps/web/public/models/lsb-reference-v4/`.
 
-Esto confirma la ruta técnica de carga/inferencia, no la calidad de reconocimiento. A 15 FPS, la ventana de 30 frames tarda como mínimo unos 2 segundos y aún falta evaluar la paridad de landmarks Python/Web, el comportamiento por clase y el rendimiento móvil. Para comparar otras opciones y priorizar un reconocedor LSB fluido, consulta [`sign-model-options.md`](./sign-model-options.md).
+Esto confirma la ruta técnica de carga/inferencia, no la calidad de reconocimiento. A 30 FPS, cada segmento de 30 frames tarda como mínimo unos 1,0 s; el solapamiento entre señas, las pausas y el rendimiento de MediaPipe condicionan la fluidez. Aún falta evaluar la paridad de landmarks Python/Web, el comportamiento por clase, la calibración de la segmentación y el rendimiento móvil. Para comparar otras opciones y priorizar un reconocedor LSB fluido, consulta [`sign-model-options.md`](./sign-model-options.md).
 
 - **Fecha:** 2026-10-23 (actualizado)
 - **Alcance:** landmarks, inferencia local y viabilidad de WebGPU
@@ -34,7 +34,7 @@ Conclusión: es una base adecuada para extraer las manos y la pose que necesita 
 
 ### WebGPU y ONNX Runtime Web
 
-ONNX Runtime Web documenta un execution provider WebGPU para ejecutar modelos ONNX en el navegador. También ofrece WASM como fallback. La disponibilidad de WebGPU depende de navegador, sistema operativo y dispositivo, por lo que la aplicación debe detectar capacidad y degradar sin bloquear el flujo de texto o la captura de demostración.
+ONNX Runtime Web documenta un execution provider WebGPU para ejecutar modelos ONNX en el navegador. También ofrece WASM como fallback. La disponibilidad de WebGPU depende de navegador, sistema operativo y dispositivo, por lo que la aplicación debe detectar capacidad y degradar sin bloquear la escritura de texto ni el resto del flujo de atención.
 
 WebGPU es relevante para el clasificador de secuencia, no para sustituir la extracción de landmarks de MediaPipe. Un modelo de 30×138 y 58 clases es pequeño; la latencia real debe medirse antes de optimizar.
 
@@ -80,10 +80,12 @@ Video local
 Pose + manos
   ↓ extractor puro
 Vector de 138 features
-  ↓ buffer de 30 fotogramas
+  ↓ segmentador por movimiento
+Buffer de 30 fotogramas
 ONNX Runtime Web (WebGPU → WASM)
   ↓ softmax + umbral
 Etiqueta candidata
+  ↓ acumulación en borrador editable
   ↓ revisión humana
 Mensaje confirmado
 ```
@@ -113,9 +115,9 @@ Antes de afirmar que el reconocimiento funciona:
 ## Preguntas abiertas
 
 - ¿El modelo de referencia acepta landmarks de MediaPipe Tasks Web sin ajustes de escala?
-- ¿La latencia de Holistic a 15 fps es aceptable en móviles de gama media?
+- ¿La latencia de Holistic a 30 fps es aceptable en móviles de gama media?
 - ¿Conviene usar Holistic o separar HandLandmarker y PoseLandmarker?
-- ¿La ventana de 30 fotogramas debe ser fija o deslizante con detección de inicio/fin?
+- ¿Los umbrales de movimiento, el cooldown y la deduplicación segmentan bien señas repetidas o encadenadas?
 - ¿Qué marcadores no manuales son necesarios para la gramática LSB objetivo?
 - ¿Qué corpus autorizado y qué licencia permitirán entrenar un modelo propio?
 

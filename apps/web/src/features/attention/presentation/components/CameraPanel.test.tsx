@@ -1,28 +1,93 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { LandmarkFrame, LandmarkPoint } from "@/features/sign-recognition/domain/landmarks";
 
 const classifierMocks = vi.hoisted(() => ({
   initialize: vi.fn(async () => undefined),
-  classify: vi.fn(async (sequence: readonly Float32Array[]) => ({
+  classify: vi.fn<(sequence: Float32Array[]) => Promise<{ label: string; classIndex: number; confidence: number }>>(async () => ({
     label: "HOLA",
     classIndex: 39,
-    confidence: sequence.length === 30 ? 0.91 : 0.49,
+    confidence: 0.91,
   })),
   close: vi.fn(),
 }));
 
-vi.mock("@/features/sign-recognition", () => ({
-  LandmarkOverlay: () => null,
-  LSB_SEQUENCE_LENGTH: 30,
-  useLandmarkDetection: () => ({
+function createHand(offsetX: number): LandmarkPoint[] {
+  return Array.from({ length: 21 }, (_, index) => ({
+    x: offsetX + index * 0.001,
+    y: 0.2 + index * 0.001,
+    z: 0,
+  }));
+}
+
+function createLandmarks(offsetX: number): LandmarkFrame {
+  return {
+    pose: null,
+    leftHand: null,
+    rightHand: createHand(offsetX),
+    timestampMs: 0,
+  };
+}
+
+function createFeatures(seed = 0): Float32Array {
+  const features = new Float32Array(138);
+  features[0] = seed;
+  return features;
+}
+
+interface LandmarkStoreState {
+  status: "idle" | "loading" | "ready" | "error";
+  error: string | null;
+  landmarks: LandmarkFrame | null;
+  features: Float32Array | null;
+}
+
+const landmarkStore = vi.hoisted(() => {
+  const hand = (offsetX: number) => Array.from({ length: 21 }, (_, index) => ({
+    x: offsetX + index * 0.001,
+    y: 0.2 + index * 0.001,
+    z: 0,
+  }));
+  const initial: LandmarkStoreState = {
     status: "ready",
     error: null,
-    landmarks: { pose: null, leftHand: [{ x: 0.2, y: 0.2, z: 0 }], rightHand: null, timestampMs: 1 },
+    landmarks: {
+      pose: null,
+      leftHand: null,
+      rightHand: hand(0.1),
+      timestampMs: 0,
+    },
     features: new Float32Array(138),
-  }),
-}));
+  };
+  let state = initial;
+  const listeners = new Set<() => void>();
+  return {
+    get: () => state,
+    set: (next: LandmarkStoreState) => {
+      state = next;
+      listeners.forEach((listener) => listener());
+    },
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
+});
+
+vi.mock("@/features/sign-recognition", async () => {
+  const { useSyncExternalStore } = await import("react");
+  const { ContinuousSignSegmenter } = await import("@/features/sign-recognition/application/continuous-sign-segmenter");
+  return {
+    ContinuousSignSegmenter,
+    LandmarkOverlay: () => null,
+    LSB_SEQUENCE_LENGTH: 30,
+    useLandmarkDetection: () => useSyncExternalStore(landmarkStore.subscribe, landmarkStore.get),
+  };
+});
 
 vi.mock("@/features/sign-recognition/infrastructure/onnx-lsb-classifier", () => ({
   OnnxLsbReferenceClassifier: class {
@@ -47,20 +112,6 @@ vi.mock("@/components/ui/Dialog", () => ({
     : null,
 }));
 
-vi.mock("@/components/ui/Select", () => ({
-  Select: ({ id, label, value, options, onValueChange }: {
-    id: string;
-    label: string;
-    value: string;
-    options: Array<{ value: string; label: string }>;
-    onValueChange: (value: string) => void;
-  }) => (
-    <label htmlFor={id}>{label}<select id={id} value={value} onChange={(event) => onValueChange(event.currentTarget.value)}>
-      {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-    </select></label>
-  ),
-}));
-
 import { useAttentionStore } from "@/features/attention/application/attention-store";
 import { MOCK_HISTORY } from "@/features/procedure-history/mocks/history.mock";
 import { CameraPanel } from "./CameraPanel";
@@ -74,8 +125,8 @@ function resetStore() {
     captureText: "",
     captureScore: null,
     captureProgress: 0,
-    captureError: null,
-    failNextRecognition: false,
+    continuousCapture: false,
+    lastCaptureWasCharacter: false,
     draft: "",
     draftError: null,
     notes: "",
@@ -90,6 +141,35 @@ function resetStore() {
   });
 }
 
+function resetLandmarks() {
+  landmarkStore.set({
+    status: "ready",
+    error: null,
+    landmarks: createLandmarks(0.1),
+    features: createFeatures(),
+  });
+}
+
+function pushFrame(offsetX: number, seed: number) {
+  act(() => {
+    landmarkStore.set({
+      status: "ready",
+      error: null,
+      landmarks: createLandmarks(offsetX),
+      features: createFeatures(seed),
+    });
+  });
+}
+
+function feedSegment() {
+  pushFrame(0.1, 0);
+  pushFrame(0.13, 1);
+  pushFrame(0.16, 2);
+  for (let index = 3; index <= 30; index += 1) {
+    pushFrame(0.16, index);
+  }
+}
+
 const camera = {
   status: "active" as const,
   stream: null,
@@ -101,46 +181,81 @@ const camera = {
   stop: vi.fn(),
 };
 
-describe("CameraPanel model capture", () => {
+describe("CameraPanel continuous recognition", () => {
   beforeEach(() => {
     resetStore();
+    resetLandmarks();
     classifierMocks.initialize.mockClear();
     classifierMocks.classify.mockClear();
     classifierMocks.close.mockClear();
   });
 
-  it("loads the LSB model, collects 30 frames and opens an editable candidate", async () => {
+  it("starts continuous recognition and appends a recognized sign to the transcript", async () => {
     const user = userEvent.setup();
     render(<CameraPanel camera={camera} />);
 
-    await user.click(screen.getByRole("button", { name: "Ajustes de captura" }));
-    await user.selectOptions(screen.getByLabelText("Modelo de reconocimiento"), "lsb-reference-v4");
-    await waitFor(() => expect(screen.getByText(/Modelo cargado y verificado localmente/)).toBeInTheDocument());
-    await user.click(screen.getByRole("button", { name: "Cerrar ajustes" }));
+    await waitFor(() => expect(screen.getByText(/Modelo LSB de referencia listo/)).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: "Iniciar reconocimiento continuo" }));
 
-    await user.click(screen.getByRole("button", { name: "Capturar una seña con la cámara" }));
-    await waitFor(() => expect(useAttentionStore.getState().captureStatus).toBe("reviewing"));
+    expect(useAttentionStore.getState().continuousCapture).toBe(true);
+    expect(useAttentionStore.getState().captureStatus).toBe("capturing");
 
-    expect(classifierMocks.initialize).toHaveBeenCalledOnce();
-    expect(classifierMocks.classify).toHaveBeenCalledOnce();
+    feedSegment();
+
+    await waitFor(() => expect(classifierMocks.classify).toHaveBeenCalledOnce());
+    await waitFor(() => expect(useAttentionStore.getState().captureText).toBe("HOLA"));
+
     expect(classifierMocks.classify.mock.calls[0]?.[0]).toHaveLength(30);
+    expect(useAttentionStore.getState().captureStatus).toBe("capturing");
+    expect(useAttentionStore.getState().continuousCapture).toBe(true);
+
+    await user.click(screen.getByRole("button", { name: "Detener reconocimiento continuo" }));
+
+    expect(useAttentionStore.getState().continuousCapture).toBe(false);
+    expect(useAttentionStore.getState().captureStatus).toBe("reviewing");
     expect(useAttentionStore.getState().captureText).toBe("HOLA");
-    expect(useAttentionStore.getState().captureScore).toBe(0.91);
   });
 
-  it("abstains instead of opening a proposal when the score is below 50%", async () => {
+  it("keeps recognition active and reports an uncertain sign", async () => {
     classifierMocks.classify.mockResolvedValueOnce({ label: "YO", classIndex: 43, confidence: 0.49 });
     const user = userEvent.setup();
     render(<CameraPanel camera={camera} />);
 
-    await user.click(screen.getByRole("button", { name: "Ajustes de captura" }));
-    await user.selectOptions(screen.getByLabelText("Modelo de reconocimiento"), "lsb-reference-v4");
-    await waitFor(() => expect(screen.getByText(/Modelo cargado y verificado localmente/)).toBeInTheDocument());
-    await user.click(screen.getByRole("button", { name: "Cerrar ajustes" }));
-    await user.click(screen.getByRole("button", { name: "Capturar una seña con la cámara" }));
+    await waitFor(() => expect(screen.getByText(/Modelo LSB de referencia listo/)).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: "Iniciar reconocimiento continuo" }));
+
+    feedSegment();
 
     expect(await screen.findByRole("alert")).toHaveTextContent("umbral de 50%");
-    expect(useAttentionStore.getState().captureStatus).toBe("idle");
     expect(useAttentionStore.getState().captureText).toBe("");
+    expect(useAttentionStore.getState().continuousCapture).toBe(true);
+    expect(useAttentionStore.getState().captureStatus).toBe("capturing");
+  });
+
+  it("accepts the model space label while keeping recognition active", async () => {
+    classifierMocks.classify.mockResolvedValueOnce({ label: " ", classIndex: 38, confidence: 0.92 });
+    const user = userEvent.setup();
+    render(<CameraPanel camera={camera} />);
+
+    await waitFor(() => expect(screen.getByText(/Modelo LSB de referencia listo/)).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: "Iniciar reconocimiento continuo" }));
+    useAttentionStore.setState({ captureText: "HOLA" });
+
+    feedSegment();
+
+    await waitFor(() => expect(useAttentionStore.getState().captureText).toBe("HOLA "));
+    expect(useAttentionStore.getState().continuousCapture).toBe(true);
+  });
+
+  it("requires resolving a pending transcript before starting another capture", async () => {
+    useAttentionStore.setState({ captureStatus: "reviewing", captureText: "HOLA" });
+    render(<CameraPanel camera={camera} />);
+
+    await waitFor(() => expect(screen.getByText(/Modelo LSB de referencia listo/)).toBeInTheDocument());
+
+    const startButton = screen.getByRole("button", { name: "Iniciar reconocimiento continuo" });
+    expect(startButton).toBeDisabled();
+    expect(startButton).toHaveAttribute("title", "Confirma o descarta la transcripción pendiente");
+    expect(screen.getByText(/Confirma o descarta la transcripción antes de iniciar otra captura/)).toBeInTheDocument();
   });
 });

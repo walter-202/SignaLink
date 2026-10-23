@@ -10,10 +10,10 @@ import {
   reopenAttentionRecord,
   updateAttentionRecord,
 } from "../infrastructure/attention-repository";
-import { recognizeMockSign } from "./mock-recognition-service";
 import { procedureNotesSchema, replyTextSchema } from "./validation";
+import { appendRecognizedLabel, isCharacterLabel } from "./sign-transcript";
 
-export type CaptureStatus = "idle" | "capturing" | "processing" | "reviewing" | "confirmed" | "error";
+export type CaptureStatus = "idle" | "capturing" | "processing" | "reviewing" | "confirmed";
 export type ConversationMode = "capture" | "reply";
 
 interface AttentionState {
@@ -24,8 +24,8 @@ interface AttentionState {
   captureText: string;
   captureScore: number | null;
   captureProgress: number;
-  captureError: string | null;
-  failNextRecognition: boolean;
+  continuousCapture: boolean;
+  lastCaptureWasCharacter: boolean;
   draft: string;
   draftError: string | null;
   notes: string;
@@ -39,17 +39,16 @@ interface AttentionState {
   syncError: string | null;
   loadRecords: () => Promise<void>;
   clearSyncError: () => void;
-  startCapture: () => Promise<void>;
-  beginModelCapture: () => void;
+  startContinuousCapture: () => void;
+  appendModelCapture: (label: string, score: number) => void;
+  resumeContinuousCapture: () => void;
+  stopContinuousCapture: () => void;
   setCaptureProgress: (progress: number) => void;
   setCaptureProcessing: () => void;
-  completeModelCapture: (captureText: string, score: number) => void;
   cancelCapture: () => void;
   confirmCapture: () => Promise<void>;
   setCaptureText: (value: string) => void;
-  retryCapture: () => Promise<void>;
   clearCapture: () => void;
-  setFailNextRecognition: (enabled: boolean) => void;
   setDraft: (value: string) => void;
   sendReply: (source?: ConversationMessage["source"]) => Promise<boolean>;
   setNotes: (value: string) => void;
@@ -60,8 +59,6 @@ interface AttentionState {
   startNewAttention: () => Promise<void>;
   reopenAttention: (recordId: string) => Promise<void>;
 }
-
-let captureAttempt = 0;
 
 function replaceRecord(
   records: HistoryRecord[],
@@ -96,8 +93,8 @@ export const useAttentionStore = create<AttentionState>((set, get) => ({
   captureText: "",
   captureScore: null,
   captureProgress: 0,
-  captureError: null,
-  failNextRecognition: false,
+  continuousCapture: false,
+  lastCaptureWasCharacter: false,
   draft: "",
   draftError: null,
   notes: "",
@@ -123,6 +120,12 @@ export const useAttentionStore = create<AttentionState>((set, get) => ({
         notes: activeRecord?.notes ?? "",
         notesDirty: false,
         messages: activeRecord?.messages ?? [],
+        continuousCapture: false,
+        lastCaptureWasCharacter: false,
+        captureStatus: "idle",
+        captureText: "",
+        captureScore: null,
+        captureProgress: 0,
         isReady: true,
         isLoading: false,
       });
@@ -137,51 +140,43 @@ export const useAttentionStore = create<AttentionState>((set, get) => ({
 
   clearSyncError: () => set({ syncError: null }),
 
-  startCapture: async () => {
-    const activeRecord = getRecord(get());
-    if (activeRecord?.status !== "active") return;
-    const attempt = ++captureAttempt;
-    const shouldFail = get().failNextRecognition;
+  startContinuousCapture: () => {
+    if (getRecord(get())?.status !== "active") return;
     set({
+      continuousCapture: true,
+      lastCaptureWasCharacter: false,
       captureStatus: "capturing",
-      captureError: null,
       captureText: "",
       captureScore: null,
       captureProgress: 0,
-      failNextRecognition: false,
       mode: "capture",
     });
-    await Promise.resolve();
-    if (attempt !== captureAttempt) return;
-    set({ captureStatus: "processing" });
-    try {
-      const suggestion = await recognizeMockSign({
-        simulateError: shouldFail,
-        onProcessing: () => {
-          if (attempt === captureAttempt) set({ captureStatus: "processing" });
-        },
-      });
-      if (attempt !== captureAttempt) return;
-      set({ captureStatus: "reviewing", captureText: suggestion });
-    } catch (error) {
-      if (attempt !== captureAttempt) return;
-      set({
-        captureStatus: "error",
-        captureError: error instanceof Error ? error.message : "Ocurrió un error de demostración.",
-      });
-    }
   },
 
-  beginModelCapture: () => {
-    if (getRecord(get())?.status !== "active") return;
-    captureAttempt += 1;
+  appendModelCapture: (label, score) => {
+    const state = get();
+    if (!state.continuousCapture || getRecord(state)?.status !== "active") return;
     set({
+      captureText: appendRecognizedLabel(state.captureText, label, state.lastCaptureWasCharacter).slice(0, 500),
+      lastCaptureWasCharacter: isCharacterLabel(label),
+      captureScore: score,
       captureStatus: "capturing",
-      captureText: "",
-      captureScore: null,
       captureProgress: 0,
-      captureError: null,
-      mode: "capture",
+    });
+  },
+
+  resumeContinuousCapture: () => {
+    if (!get().continuousCapture) return;
+    set({ captureStatus: "capturing", captureProgress: 0 });
+  },
+
+  stopContinuousCapture: () => {
+    const state = get();
+    if (!state.continuousCapture) return;
+    set({
+      continuousCapture: false,
+      captureStatus: state.captureText.trim() ? "reviewing" : "idle",
+      captureProgress: 0,
     });
   },
 
@@ -193,19 +188,15 @@ export const useAttentionStore = create<AttentionState>((set, get) => ({
     if (get().captureStatus === "capturing") set({ captureStatus: "processing" });
   },
 
-  completeModelCapture: (captureText, captureScore) => {
-    if (get().captureStatus !== "processing") return;
-    set({
-      captureStatus: "reviewing",
-      captureText,
-      captureScore,
-      captureError: null,
-    });
-  },
-
   cancelCapture: () => {
-    captureAttempt += 1;
-    set({ captureStatus: "idle", captureText: "", captureScore: null, captureProgress: 0, captureError: null });
+    set({
+      continuousCapture: false,
+      lastCaptureWasCharacter: false,
+      captureStatus: "idle",
+      captureText: "",
+      captureScore: null,
+      captureProgress: 0,
+    });
   },
 
   confirmCapture: async () => {
@@ -222,25 +213,32 @@ export const useAttentionStore = create<AttentionState>((set, get) => ({
       set((current) => ({
         messages,
         captureStatus: "confirmed",
-        captureError: null,
+        continuousCapture: false,
+        lastCaptureWasCharacter: false,
         syncError: null,
         records: replaceRecord(current.records, record.id, (currentRecord) => ({ ...currentRecord, messages })),
       }));
     } catch (error) {
-      set({ syncError: error instanceof Error ? error.message : "No se pudo guardar el mensaje.", captureError: "No se guardó el mensaje. Puedes volver a intentarlo." });
+      set({ syncError: error instanceof Error ? error.message : "No se pudo guardar el mensaje." });
     } finally {
       set({ isSaving: false });
     }
   },
 
-  setCaptureText: (captureText) => set({ captureText }),
+  setCaptureText: (captureText) => set({
+    captureText,
+    captureScore: null,
+    lastCaptureWasCharacter: false,
+  }),
 
-  retryCapture: async () => {
-    await get().startCapture();
-  },
-
-  clearCapture: () => set({ captureStatus: "idle", captureText: "", captureScore: null, captureProgress: 0, captureError: null }),
-  setFailNextRecognition: (enabled) => set({ failNextRecognition: enabled }),
+  clearCapture: () => set({
+    continuousCapture: false,
+    lastCaptureWasCharacter: false,
+    captureStatus: "idle",
+    captureText: "",
+    captureScore: null,
+    captureProgress: 0,
+  }),
   setDraft: (draft) => set({ draft, draftError: null }),
 
   sendReply: async (source = "typed") => {
@@ -337,17 +335,17 @@ export const useAttentionStore = create<AttentionState>((set, get) => ({
     const state = get();
     const record = getRecord(state);
     if (!record || record.status !== "active" || state.isSaving) return;
-    captureAttempt += 1;
     set({ isSaving: true, syncError: null });
     try {
       const { durationMinutes } = await finishAttentionRecord(record.id);
       set((current) => ({
         records: replaceRecord(current.records, record.id, (item) => ({ ...item, status: "completed", durationMinutes })),
+        continuousCapture: false,
+        lastCaptureWasCharacter: false,
         captureStatus: "idle",
         captureText: "",
         captureScore: null,
         captureProgress: 0,
-        captureError: null,
         syncError: null,
       }));
     } catch (error) {
@@ -362,16 +360,16 @@ export const useAttentionStore = create<AttentionState>((set, get) => ({
     set({ isSaving: true, syncError: null });
     try {
       const record = await createAttentionRecord("Registro ciudadano");
-      captureAttempt += 1;
       set((current) => ({
         records: [record, ...current.records],
         activeRecordId: record.id,
         procedureType: record.procedureType,
+        continuousCapture: false,
+        lastCaptureWasCharacter: false,
         captureStatus: "idle",
         captureText: "",
         captureScore: null,
         captureProgress: 0,
-        captureError: null,
         draft: "",
         draftError: null,
         notes: "",
@@ -394,7 +392,6 @@ export const useAttentionStore = create<AttentionState>((set, get) => ({
     set({ isSaving: true, syncError: null });
     try {
       await reopenAttentionRecord(recordId);
-      captureAttempt += 1;
       set((state) => ({
         records: replaceRecord(state.records, recordId, (item) => ({ ...item, status: "active" })),
         activeRecordId: recordId,
@@ -402,11 +399,12 @@ export const useAttentionStore = create<AttentionState>((set, get) => ({
         messages: record.messages,
         notes: record.notes,
         notesDirty: false,
+        continuousCapture: false,
+        lastCaptureWasCharacter: false,
         captureStatus: "idle",
         captureText: "",
         captureScore: null,
         captureProgress: 0,
-        captureError: null,
         draft: "",
         draftError: null,
         syncError: null,

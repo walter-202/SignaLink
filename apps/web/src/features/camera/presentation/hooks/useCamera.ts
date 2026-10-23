@@ -26,19 +26,19 @@ const getServerSupportSnapshot = () => false;
 function getCameraErrorMessage(code: CameraErrorCode): string {
   switch (code) {
     case "not-supported":
-      return "Este navegador no permite acceder a la cámara. Puedes continuar con la captura de demostración o escribir la respuesta.";
+      return "Este navegador no permite acceder a la cámara. Puedes escribir la respuesta.";
     case "insecure-context":
       return "La cámara requiere una conexión segura con HTTPS o ejecutarse en localhost.";
     case "not-allowed":
-      return "No se autorizó la cámara. Habilita el permiso del sitio o continúa con la captura de demostración.";
+      return "No se autorizó la cámara. Habilita el permiso del sitio para capturar o escribe la respuesta.";
     case "not-found":
-      return "No se encontró una cámara disponible. Puedes usar la captura de demostración o escribir la respuesta.";
+      return "No se encontró una cámara disponible. Puedes escribir la respuesta.";
     case "in-use":
       return "Otra aplicación está usando la cámara. Ciérrala e inténtalo de nuevo.";
     case "overconstrained":
       return "La cámara no admite la configuración solicitada. Vuelve a intentarlo.";
     case "unknown":
-      return "No se pudo iniciar la cámara. Puedes reintentar o usar la captura de demostración.";
+      return "No se pudo iniciar la cámara. Puedes reintentar o escribir la respuesta.";
   }
 }
 
@@ -119,7 +119,7 @@ export function useCamera(): UseCameraReturn {
           setStream(null);
           setStatus("error");
           setErrorCode("unknown");
-          setError("La cámara dejó de transmitir. Vuelve a activarla o usa la captura de demostración.");
+          setError("La cámara dejó de transmitir. Vuelve a activarla o escribe la respuesta.");
         }, { once: true });
       });
     } catch (cause) {

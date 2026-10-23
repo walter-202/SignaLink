@@ -490,6 +490,8 @@ h1, h2, h3, p { margin-top: 0; }
 .camera-disclaimer { display: flex; align-items: flex-start; gap: 0.35rem; margin: 0; border-top: 1px solid var(--line); padding-top: 10px; color: var(--subtle); font-size: 0.65rem; line-height: 1.45; }
 .camera-disclaimer > svg { flex: 0 0 auto; margin-top: 1px; color: var(--brand); }
 .camera-settings-block { display: grid; gap: 6px; margin-bottom: 16px; border-bottom: 1px solid var(--line); padding-bottom: 16px; }
+.camera-model-name { margin: 0; color: var(--ink); font-size: 0.72rem; }
+.camera-model-name strong { font-weight: 700; }
 .camera-model-status, .camera-model-error { margin: -3px 0 0; border-radius: 7px; padding: 0.42rem 0.55rem; font-size: 0.64rem; line-height: 1.4; }
 .camera-model-status { background: #e8f7f5; color: #08715f; }
 .camera-model-error { background: #fff4f1; color: #a42a1a; }
@@ -520,10 +522,13 @@ h1, h2, h3, p { margin-top: 0; }
 .conversation-empty svg { color: #8aaeb0; }
 .conversation-empty strong { color: var(--ink); font-size: 0.8rem; }
 .conversation-empty span { max-width: 240px; font-size: 0.7rem; line-height: 1.45; }
-.capture-progress { display: flex; align-items: center; gap: 0.55rem; border-radius: 9px; background: var(--info-soft); color: #344f7d; padding: 0.65rem; font-size: 0.69rem; }
 .spinner { width: 15px; height: 15px; border: 2px solid #bfdbfe; border-top-color: #2563eb; border-radius: 50%; animation: spin 800ms linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.message-review, .capture-error { display: grid; gap: 8px; border: 1px solid #fed7aa; border-radius: 10px; background: #fffaf3; padding: 10px; }
+.message-review { display: grid; gap: 8px; border: 1px solid #fed7aa; border-radius: 10px; background: #fffaf3; padding: 10px; }
+.message-review--live { border-color: #b8e3dc; background: #f3fbf9; }
+.message-review--live .review-title-row { color: #0f5f55; }
+.message-review--live .review-title-row > span { color: #4b6f6a; }
+.live-status-dot { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: #0d9488; box-shadow: 0 0 0 3px rgb(13 148 136 / 14%); }
 .review-title-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; color: #854d0e; font-size: 0.68rem; }
 .review-title-row > div { display: flex; align-items: center; gap: 0.35rem; }
 .review-title-row > span { color: #8a6b3f; font-size: 0.62rem; }

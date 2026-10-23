@@ -9,26 +9,28 @@ import {
   RotateCcw,
   ScanFace,
   ShieldCheck,
+  Square,
   TriangleAlert,
   VideoOff,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
-import { Select } from "@/components/ui/Select";
 import { useAttentionStore } from "@/features/attention/application/attention-store";
 import type { CameraStatus, UseCameraReturn } from "@/features/camera";
-import { LandmarkOverlay, useLandmarkDetection, LSB_SEQUENCE_LENGTH } from "@/features/sign-recognition";
+import {
+  ContinuousSignSegmenter,
+  LandmarkOverlay,
+  useLandmarkDetection,
+  LSB_SEQUENCE_LENGTH,
+} from "@/features/sign-recognition";
 import { LSB_REFERENCE_V4, formatMiB } from "@/features/sign-recognition/domain/model-catalog";
 import type { SignClassifier } from "@/features/sign-recognition/application/ports/sign-classifier";
 
-const recognitionModels = [
-  { value: "demo", label: "Demo fija · sin reconocimiento" },
-  { value: LSB_REFERENCE_V4.id, label: `LSB de referencia · v4 · ${formatMiB(LSB_REFERENCE_V4.modelBytes)}` },
-];
-
 const landmarksEnabledByDefault = process.env.NEXT_PUBLIC_SIGN_LANDMARKS !== "off";
-type ModelLoadStatus = "idle" | "loading" | "ready" | "error";
+const continuousFrameIntervalMs = 33;
+const duplicateLabelWindowMs = 900;
+type ModelLoadStatus = "loading" | "ready" | "error";
 
 interface CameraPanelProps {
   camera: UseCameraReturn;
@@ -36,57 +38,56 @@ interface CameraPanelProps {
 
 export function CameraPanel({ camera }: CameraPanelProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [model, setModel] = useState("demo");
-  const [modelLoadStatus, setModelLoadStatus] = useState<ModelLoadStatus>("idle");
-  const [modelLoadDetail, setModelLoadDetail] = useState("");
+  const [modelLoadStatus, setModelLoadStatus] = useState<ModelLoadStatus>("loading");
+  const [modelLoadDetail, setModelLoadDetail] = useState("Preparando el motor de inferencia local…");
   const [modelLoadAttempt, setModelLoadAttempt] = useState(0);
   const [modelCaptureError, setModelCaptureError] = useState<string | null>(null);
   const [landmarksEnabled, setLandmarksEnabled] = useState(landmarksEnabledByDefault);
   const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const classifierRef = useRef<SignClassifier | null>(null);
-  const sequenceRef = useRef<Float32Array[]>([]);
-  const visibleHandFramesRef = useRef(0);
+  const segmenterRef = useRef(new ContinuousSignSegmenter());
+  const inferenceBusyRef = useRef(false);
+  const lastAcceptedRef = useRef<{ label: string; at: number } | null>(null);
+  const lastProgressRef = useRef(0);
+  const previousContinuousRef = useRef(false);
+  const preserveCaptureErrorRef = useRef(false);
   const captureGenerationRef = useRef(0);
   const previousStatusRef = useRef<CameraStatus>("idle");
   const captureStatus = useAttentionStore((state) => state.captureStatus);
   const captureProgress = useAttentionStore((state) => state.captureProgress);
-  const startCapture = useAttentionStore((state) => state.startCapture);
-  const beginModelCapture = useAttentionStore((state) => state.beginModelCapture);
+  const continuousCapture = useAttentionStore((state) => state.continuousCapture);
+  const startContinuousCapture = useAttentionStore((state) => state.startContinuousCapture);
+  const appendModelCapture = useAttentionStore((state) => state.appendModelCapture);
+  const resumeContinuousCapture = useAttentionStore((state) => state.resumeContinuousCapture);
+  const stopContinuousCapture = useAttentionStore((state) => state.stopContinuousCapture);
   const setCaptureProgress = useAttentionStore((state) => state.setCaptureProgress);
   const setCaptureProcessing = useAttentionStore((state) => state.setCaptureProcessing);
-  const completeModelCapture = useAttentionStore((state) => state.completeModelCapture);
   const cancelCapture = useAttentionStore((state) => state.cancelCapture);
-  const failNext = useAttentionStore((state) => state.failNextRecognition);
-  const setFailNext = useAttentionStore((state) => state.setFailNextRecognition);
   const setMode = useAttentionStore((state) => state.setMode);
   const records = useAttentionStore((state) => state.records);
   const activeRecordId = useAttentionStore((state) => state.activeRecordId);
   const sessionActive = records.find((record) => record.id === activeRecordId)?.status === "active";
-  const captureBusy = captureStatus === "capturing" || captureStatus === "processing";
-  const isReferenceModel = model === LSB_REFERENCE_V4.id;
   const landmarkDetection = useLandmarkDetection({
     video: videoElement,
     enabled: camera.isActive && landmarksEnabled,
+    frameIntervalMs: continuousFrameIntervalMs,
   });
-  const canCapture = isReferenceModel
-    ? sessionActive && camera.isActive && landmarksEnabled && landmarkDetection.status === "ready" && modelLoadStatus === "ready" && !captureBusy
-    : sessionActive && camera.isActive && !captureBusy;
-  const canUseDemo = sessionActive && !captureBusy;
+  const canStartRecognition = sessionActive
+    && camera.isActive
+    && landmarksEnabled
+    && landmarkDetection.status === "ready"
+    && modelLoadStatus === "ready"
+    && captureStatus !== "reviewing";
   const setVideoRef = useCallback((node: HTMLVideoElement | null) => {
     videoRef.current = node;
     setVideoElement(node);
   }, []);
 
   useEffect(() => {
-    if (!isReferenceModel) {
-      classifierRef.current?.close();
-      classifierRef.current = null;
-      return;
-    }
-
     let cancelled = false;
     let classifier: SignClassifier | null = null;
+    const segmenter = segmenterRef.current;
 
     void import("@/features/sign-recognition/infrastructure/onnx-lsb-classifier")
       .then(async ({ OnnxLsbReferenceClassifier }) => {
@@ -112,78 +113,140 @@ export function CameraPanel({ camera }: CameraPanelProps) {
     return () => {
       cancelled = true;
       captureGenerationRef.current += 1;
-      const status = useAttentionStore.getState().captureStatus;
-      if (status === "capturing" || status === "processing") cancelCapture();
+      inferenceBusyRef.current = false;
+      segmenter.reset();
+      const status = useAttentionStore.getState();
+      if (status.continuousCapture || status.captureStatus === "capturing" || status.captureStatus === "processing") {
+        cancelCapture();
+      }
       if (classifierRef.current === classifier) classifierRef.current = null;
       classifier?.close();
     };
-  }, [isReferenceModel, modelLoadAttempt, cancelCapture]);
+  }, [modelLoadAttempt, cancelCapture]);
 
   useEffect(() => {
-    if (captureStatus === "capturing" && isReferenceModel && landmarkDetection.features) {
-      const sequence = sequenceRef.current;
-      if (sequence.length >= LSB_SEQUENCE_LENGTH) return;
-      sequence.push(new Float32Array(landmarkDetection.features));
-      const detectedHands = landmarkDetection.landmarks;
-      if (detectedHands?.leftHand?.length || detectedHands?.rightHand?.length) {
-        visibleHandFramesRef.current += 1;
+    if (!continuousCapture || !landmarkDetection.landmarks || !landmarkDetection.features) return;
+    if (inferenceBusyRef.current) return;
+
+    const update = segmenterRef.current.push(
+      landmarkDetection.landmarks,
+      landmarkDetection.features,
+      performance.now(),
+    );
+
+    if (update.kind === "waiting") {
+      if (lastProgressRef.current !== 0) {
+        lastProgressRef.current = 0;
+        setCaptureProgress(0);
       }
-      setCaptureProgress(sequence.length);
-      if (sequence.length === LSB_SEQUENCE_LENGTH) {
-        const generation = captureGenerationRef.current;
-        const classifier = classifierRef.current;
-        setCaptureProcessing();
-        if (!classifier) {
-          cancelCapture();
-          setModelCaptureError("El modelo se cerró antes de completar la captura. Vuelve a cargarlo.");
-          return;
-        }
-        const capturedSequence = sequence.slice();
-        if (visibleHandFramesRef.current < LSB_SEQUENCE_LENGTH / 2) {
-          cancelCapture();
-          setModelCaptureError("No hubo manos visibles en suficientes fotogramas. Centra las manos y vuelve a capturar.");
-          return;
-        }
-        void classifier.classify(capturedSequence)
-          .then((prediction) => {
-            if (generation !== captureGenerationRef.current) return;
-            if (prediction.confidence < LSB_REFERENCE_V4.confidenceThreshold || !prediction.label.trim()) {
-              cancelCapture();
-              setModelCaptureError(
-                `No se obtuvo una etiqueta por encima del umbral de 50% (puntuación ${(prediction.confidence * 100).toFixed(1)}%). Ajusta el encuadre e intenta otra vez.`,
-              );
-              return;
-            }
-            setModelCaptureError(null);
-            completeModelCapture(prediction.label, prediction.confidence);
-          })
-          .catch((cause: unknown) => {
-            if (generation !== captureGenerationRef.current) return;
-            cancelCapture();
-            setModelCaptureError(cause instanceof Error ? cause.message : "Falló la inferencia local.");
-          });
-      }
+      return;
     }
+
+    if (update.kind === "collecting") {
+      if (lastProgressRef.current !== update.progress) {
+        lastProgressRef.current = update.progress;
+        setCaptureProgress(update.progress);
+      }
+      return;
+    }
+
+    const classifier = classifierRef.current;
+    if (!classifier) {
+      preserveCaptureErrorRef.current = true;
+      stopContinuousCapture();
+      setModelCaptureError("El modelo se cerró antes de completar la captura. Vuelve a cargarlo.");
+      return;
+    }
+
+    if (update.visibleHandFrames < LSB_SEQUENCE_LENGTH / 2) {
+      segmenterRef.current.beginCooldown(performance.now());
+      resumeContinuousCapture();
+      setModelCaptureError("No hubo manos visibles en suficientes fotogramas. Centra las manos y vuelve a intentarlo.");
+      return;
+    }
+
+    const generation = captureGenerationRef.current;
+    inferenceBusyRef.current = true;
+    lastProgressRef.current = 0;
+    setCaptureProcessing();
+
+    void classifier.classify(update.sequence)
+      .then((prediction) => {
+        if (generation !== captureGenerationRef.current) return;
+        if (!useAttentionStore.getState().continuousCapture) return;
+
+        segmenterRef.current.beginCooldown(performance.now());
+
+        if (!Number.isFinite(prediction.confidence) || prediction.confidence < LSB_REFERENCE_V4.confidenceThreshold || prediction.label.length === 0) {
+          resumeContinuousCapture();
+          setModelCaptureError(
+            `No se reconoció una etiqueta por encima del umbral de 50% (puntuación ${Number.isFinite(prediction.confidence) ? `${(prediction.confidence * 100).toFixed(1)}%` : "no válida"}). Repite la seña con manos y torso visibles.`,
+          );
+          return;
+        }
+
+        const now = performance.now();
+        const previous = lastAcceptedRef.current;
+        if (previous && previous.label === prediction.label && now - previous.at < duplicateLabelWindowMs) {
+          resumeContinuousCapture();
+          return;
+        }
+
+        lastAcceptedRef.current = { label: prediction.label, at: now };
+        setModelCaptureError(null);
+        appendModelCapture(prediction.label, prediction.confidence);
+      })
+      .catch((cause: unknown) => {
+        if (generation !== captureGenerationRef.current) return;
+        segmenterRef.current.beginCooldown(performance.now());
+        if (useAttentionStore.getState().continuousCapture) resumeContinuousCapture();
+        setModelCaptureError(cause instanceof Error ? cause.message : "Falló la inferencia local.");
+      })
+      .finally(() => {
+        if (generation === captureGenerationRef.current) inferenceBusyRef.current = false;
+      });
   }, [
+    continuousCapture,
     landmarkDetection.features,
     landmarkDetection.landmarks,
-    captureStatus,
-    isReferenceModel,
+    appendModelCapture,
+    resumeContinuousCapture,
     setCaptureProgress,
     setCaptureProcessing,
-    cancelCapture,
-    completeModelCapture,
+    stopContinuousCapture,
   ]);
 
   useEffect(() => {
-    if (!isReferenceModel) return;
-    if (camera.isActive && landmarksEnabled && landmarkDetection.status === "ready") return;
-    if (captureStatus !== "capturing" && captureStatus !== "processing") return;
+    if (!continuousCapture && previousContinuousRef.current) {
+      captureGenerationRef.current += 1;
+      inferenceBusyRef.current = false;
+      segmenterRef.current.reset();
+      lastProgressRef.current = 0;
+      if (preserveCaptureErrorRef.current) {
+        preserveCaptureErrorRef.current = false;
+      } else {
+        setModelCaptureError(null);
+      }
+    }
+    previousContinuousRef.current = continuousCapture;
+  }, [continuousCapture]);
+
+  useEffect(() => {
+    if (!continuousCapture) return;
+    if (camera.isActive && landmarksEnabled && landmarkDetection.status === "ready" && modelLoadStatus === "ready") return;
     captureGenerationRef.current += 1;
-    sequenceRef.current = [];
-    visibleHandFramesRef.current = 0;
-    cancelCapture();
-  }, [isReferenceModel, camera.isActive, landmarksEnabled, landmarkDetection.status, captureStatus, cancelCapture]);
+    inferenceBusyRef.current = false;
+    segmenterRef.current.reset();
+    lastProgressRef.current = 0;
+    stopContinuousCapture();
+  }, [
+    camera.isActive,
+    continuousCapture,
+    landmarkDetection.status,
+    landmarksEnabled,
+    modelLoadStatus,
+    stopContinuousCapture,
+  ]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -204,25 +267,28 @@ export function CameraPanel({ camera }: CameraPanelProps) {
     previousStatusRef.current = camera.status;
   }, [camera.isActive, camera.status]);
 
-  function handleDemoCapture() {
-    setMode("capture");
-    setModelCaptureError(null);
-    void startCapture();
-  }
+  function handleRecognitionToggle() {
+    if (continuousCapture) {
+      captureGenerationRef.current += 1;
+      inferenceBusyRef.current = false;
+      segmenterRef.current.reset();
+      lastProgressRef.current = 0;
+      setModelCaptureError(null);
+      stopContinuousCapture();
+      return;
+    }
 
-  function handleLsbCapture() {
-    if (!classifierRef.current || modelLoadStatus !== "ready") return;
+    if (!canStartRecognition || !classifierRef.current) return;
+
     captureGenerationRef.current += 1;
-    sequenceRef.current = [];
-    visibleHandFramesRef.current = 0;
+    inferenceBusyRef.current = false;
+    segmenterRef.current.reset();
+    lastAcceptedRef.current = null;
+    lastProgressRef.current = 0;
+    preserveCaptureErrorRef.current = false;
     setModelCaptureError(null);
     setMode("capture");
-    beginModelCapture();
-  }
-
-  function handleShutter() {
-    if (isReferenceModel) handleLsbCapture();
-    else void startCapture();
+    startContinuousCapture();
   }
 
   const statusChip = camera.status === "active"
@@ -260,10 +326,10 @@ export function CameraPanel({ camera }: CameraPanelProps) {
     stageMessage = "Acepta el acceso a la cámara en el navegador para ver la vista previa.";
   } else if (camera.status === "error") {
     stageTitle = "No se pudo activar la cámara";
-    stageMessage = camera.error ?? "Puedes reintentar o usar la captura de demostración.";
+    stageMessage = camera.error ?? "Puedes reintentar o escribir la respuesta.";
   } else if (!camera.isSupported) {
     stageTitle = "Cámara no disponible";
-    stageMessage = "Este navegador no permite acceder a la cámara. Puedes usar la captura de demostración o escribir la respuesta.";
+    stageMessage = "Este navegador no permite acceder a la cámara. Puedes escribir la respuesta.";
   }
 
   const captureHint = !sessionActive
@@ -272,26 +338,29 @@ export function CameraPanel({ camera }: CameraPanelProps) {
       ? "Esperando acceso a la cámara."
       : camera.status === "error"
         ? "La captura está deshabilitada."
-        : isReferenceModel && modelLoadStatus === "loading"
+        : modelLoadStatus === "loading"
           ? "Cargando el modelo local; espera para capturar."
-          : isReferenceModel && modelLoadStatus === "error"
+          : modelLoadStatus === "error"
             ? "No se pudo cargar el modelo; abre ajustes para reintentar."
-            : isReferenceModel && modelLoadStatus === "idle"
-              ? "Selecciona el modelo en ajustes para iniciar su carga local."
-          : isReferenceModel && !landmarksEnabled
-            ? "Activa los landmarks locales en los ajustes para usar el modelo."
-            : isReferenceModel && landmarkDetection.status === "loading"
-              ? "Esperando que los landmarks estén listos."
-              : isReferenceModel && landmarkDetection.status === "error"
-                ? "No se pudieron cargar los landmarks; revisa la conexión y vuelve a activar la cámara."
-              : camera.isActive
-                ? isReferenceModel
-                  ? "Mantén manos y torso visibles; la secuencia tarda cerca de 2 segundos."
-                  : "Mantén las manos y el torso visibles."
-                : "La captura se habilita al activar la cámara.";
+            : !landmarksEnabled
+              ? "Activa los landmarks locales en los ajustes para usar el modelo."
+              : landmarkDetection.status === "loading"
+                ? "Esperando que los landmarks estén listos."
+                : landmarkDetection.status === "error"
+                  ? "No se pudieron cargar los landmarks; revisa la conexión y vuelve a activar la cámara."
+                  : continuousCapture
+                    ? captureStatus === "processing"
+                      ? "Clasificando la seña en este dispositivo…"
+                      : captureProgress > 0
+                        ? `Capturando ${captureProgress}/${LSB_SEQUENCE_LENGTH} fotogramas…`
+                        : "Esperando una seña; mueve las manos o detén para revisar."
+                    : captureStatus === "reviewing"
+                      ? "Confirma o descarta la transcripción antes de iniciar otra captura."
+                      : camera.isActive
+                        ? "Inicia el reconocimiento continuo; las señas estables se agregan al texto."
+                        : "La captura se habilita al activar la cámara.";
 
   const showPrimaryAction = sessionActive && camera.isSupported && camera.status !== "requesting";
-  const showDemoAction = sessionActive && camera.status !== "requesting";
 
   return (
     <section id="camera-capture-panel" className="panel-card camera-panel" aria-label="Captura y reconocimiento de señas">
@@ -381,17 +450,6 @@ export function CameraPanel({ camera }: CameraPanelProps) {
                       {camera.status === "error" ? "Reintentar" : "Activar cámara"}
                     </Button>
                   ) : null}
-                  {showDemoAction ? (
-                    <Button
-                      className="camera-stage-secondary"
-                      variant="ghost"
-                      size="small"
-                      onClick={handleDemoCapture}
-                      disabled={!canUseDemo}
-                    >
-                      Usar captura de demostración
-                    </Button>
-                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -420,16 +478,16 @@ export function CameraPanel({ camera }: CameraPanelProps) {
           </div>
         ) : null}
 
-        {captureBusy ? (
-          <span className="camera-processing" role="status">
-            <LoaderCircle className="camera-spinner" size={14} aria-hidden="true" />
-            {captureStatus === "capturing"
-              ? isReferenceModel
+        {continuousCapture ? (
+          <span className="camera-processing">
+            {captureStatus === "processing"
+              ? <LoaderCircle className="camera-spinner" size={14} aria-hidden="true" />
+              : <ScanFace size={14} aria-hidden="true" />}
+            {captureStatus === "processing"
+              ? "Clasificando en este dispositivo…"
+              : captureProgress > 0
                 ? `Capturando ${captureProgress}/${LSB_SEQUENCE_LENGTH}…`
-                : "Preparando captura…"
-              : isReferenceModel
-                ? "Clasificando en este dispositivo…"
-                : "Procesando demostración…"}
+                : "Esperando una seña…"}
           </span>
         ) : null}
       </div>
@@ -442,19 +500,24 @@ export function CameraPanel({ camera }: CameraPanelProps) {
             variant="primary"
             size="capture"
             type="button"
-            onClick={handleShutter}
-            disabled={!canCapture}
-            title={camera.isActive ? undefined : "Activa la cámara para capturar"}
-            aria-label="Capturar una seña con la cámara"
+            onClick={handleRecognitionToggle}
+            disabled={!continuousCapture && !canStartRecognition}
+            title={!camera.isActive
+              ? "Activa la cámara para reconocer señas"
+              : captureStatus === "reviewing"
+                ? "Confirma o descarta la transcripción pendiente"
+                : undefined}
+            aria-label={continuousCapture ? "Detener reconocimiento continuo" : "Iniciar reconocimiento continuo"}
+            aria-pressed={continuousCapture}
             aria-describedby="camera-capture-hint"
-            aria-busy={captureBusy}
+            aria-busy={captureStatus === "processing"}
           >
-            {captureBusy
-              ? <LoaderCircle className="camera-spinner" size={22} aria-hidden="true" />
+            {continuousCapture
+              ? <Square size={20} fill="currentColor" aria-hidden="true" />
               : <Camera size={22} aria-hidden="true" />}
           </Button>
           <span className="camera-shutter-label" aria-hidden="true">
-            {captureBusy ? "Procesando" : "Capturar"}
+            {continuousCapture ? "Detener" : "Iniciar"}
           </span>
         </div>
         <span className="lsb-badge" title="Lengua de Señas Boliviana">
@@ -463,10 +526,10 @@ export function CameraPanel({ camera }: CameraPanelProps) {
       </div>
 
       {modelCaptureError ? <p className="camera-model-error" role="alert">{modelCaptureError}</p> : null}
-      {isReferenceModel && modelLoadStatus === "loading" ? (
+      {modelLoadStatus === "loading" ? (
         <p className="camera-model-status" role="status">{modelLoadDetail}</p>
       ) : null}
-      {isReferenceModel && modelLoadStatus === "ready" ? (
+      {modelLoadStatus === "ready" ? (
         <p className="camera-model-status" role="status">Modelo LSB de referencia listo · inferencia local</p>
       ) : null}
 
@@ -479,47 +542,28 @@ export function CameraPanel({ camera }: CameraPanelProps) {
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
         title="Ajustes de captura"
-        description="La cámara y la inferencia se ejecutan en el dispositivo; el modelo solo se descarga al seleccionarlo."
+        description="La cámara y la inferencia se ejecutan en el dispositivo; el modelo LSB se carga automáticamente."
       >
         <div className="camera-settings-block">
-          <label className="field-label" htmlFor="recognition-model">Modelo de reconocimiento</label>
-          <Select
-            id="recognition-model"
-            label="Modelo de reconocimiento"
-            value={model}
-            options={recognitionModels}
-            onValueChange={(nextModel) => {
-              setModel(nextModel);
-              setModelCaptureError(null);
-              if (nextModel === LSB_REFERENCE_V4.id) {
-                setModelLoadStatus("loading");
-                setModelLoadDetail("Preparando el motor de inferencia local…");
-              }
-            }}
-            className="select-trigger--full"
-          />
-          {model === "demo" ? (
-            <p className="help-text">La demo devuelve una frase fija; no ejecuta reconocimiento de señas.</p>
-          ) : (
-            <div className="camera-model-load-state" aria-live="polite">
-              {modelLoadStatus === "loading" ? <p className="help-text" role="status">{modelLoadDetail}</p> : null}
-              {modelLoadStatus === "ready" ? <p className="help-text" role="status">{modelLoadDetail} SHA-256 verificado. El runtime WASM también se guarda en caché del navegador.</p> : null}
-              {modelLoadStatus === "error" ? (
-                <div>
-                  <p className="field-error" role="alert">{modelLoadDetail}</p>
-                  <Button variant="secondary" size="small" onClick={() => {
-                    setModelLoadStatus("loading");
-                    setModelLoadDetail("Preparando el motor de inferencia local…");
-                    setModelLoadAttempt((attempt) => attempt + 1);
-                  }}>Reintentar carga</Button>
-                </div>
-              ) : null}
-              {modelLoadStatus === "idle" ? (
-                <p className="help-text">Primer uso: descarga {formatMiB(LSB_REFERENCE_V4.modelBytes)} de modelo y aproximadamente 13.6 MiB de runtime WASM. Se procesa todo localmente.</p>
-              ) : null}
-              <p className="help-text">Baseline experimental de 58 etiquetas y secuencias aisladas de 30 fotogramas. No es traducción continua ni LSB general. <a href={LSB_REFERENCE_V4.sourceUrl} target="_blank" rel="noreferrer">Proyecto y licencia MIT</a>.</p>
-            </div>
-          )}
+          <span className="field-label">Modelo de reconocimiento</span>
+          <p className="camera-model-name">
+            <strong>{LSB_REFERENCE_V4.name}</strong> · {formatMiB(LSB_REFERENCE_V4.modelBytes)}
+          </p>
+          <div className="camera-model-load-state" aria-live="polite">
+            {modelLoadStatus === "loading" ? <p className="help-text" role="status">{modelLoadDetail}</p> : null}
+            {modelLoadStatus === "ready" ? <p className="help-text" role="status">{modelLoadDetail} SHA-256 verificado. El runtime WASM también se guarda en caché del navegador.</p> : null}
+            {modelLoadStatus === "error" ? (
+              <div>
+                <p className="field-error" role="alert">{modelLoadDetail}</p>
+                <Button variant="secondary" size="small" onClick={() => {
+                  setModelLoadStatus("loading");
+                  setModelLoadDetail("Preparando el motor de inferencia local…");
+                  setModelLoadAttempt((attempt) => attempt + 1);
+                }}>Reintentar carga</Button>
+              </div>
+            ) : null}
+            <p className="help-text">El modo continuo segmenta por movimiento y clasifica secuencias aisladas de 30 fotogramas a ~30 fps. No es traducción continua ni LSB general. <a href={LSB_REFERENCE_V4.sourceUrl} target="_blank" rel="noreferrer">Proyecto y licencia MIT</a>.</p>
+          </div>
         </div>
         <label className="setting-row">
           <span><strong>Detectar landmarks en el navegador</strong><small>MediaPipe procesa la pose y las manos localmente; el video no se envía.</small></span>
@@ -529,12 +573,6 @@ export function CameraPanel({ camera }: CameraPanelProps) {
             onChange={(event) => setLandmarksEnabled(event.currentTarget.checked)}
           />
         </label>
-        {model === "demo" ? (
-          <label className="setting-row">
-            <span><strong>Simular un error en la próxima captura</strong><small>La siguiente demo mostrará un error para probar el reintento.</small></span>
-            <input type="checkbox" checked={failNext} onChange={(event) => setFailNext(event.currentTarget.checked)} />
-          </label>
-        ) : null}
         <p className="help-text">Encuadre sugerido: buena iluminación, manos y torso visibles. La vista previa no se almacena.</p>
       </Dialog>
     </section>

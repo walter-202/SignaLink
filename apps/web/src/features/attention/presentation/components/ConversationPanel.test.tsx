@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -27,8 +27,8 @@ function resetStore() {
     captureText: "",
     captureScore: null,
     captureProgress: 0,
-    captureError: null,
-    failNextRecognition: false,
+    continuousCapture: false,
+    lastCaptureWasCharacter: false,
     draft: "",
     draftError: null,
     notes: "",
@@ -46,11 +46,15 @@ function resetStore() {
 describe("ConversationPanel", () => {
   beforeEach(resetStore);
 
-  it("lets the user review and correct a simulated interpretation before confirming", async () => {
+  it("lets the user review and correct a model candidate before confirming", async () => {
+    act(() => {
+      useAttentionStore.getState().startContinuousCapture();
+      useAttentionStore.getState().appendModelCapture("HOLA", 0.87);
+      useAttentionStore.getState().stopContinuousCapture();
+    });
     const user = userEvent.setup();
-    render(<ConversationPanel onRespond={() => undefined} onUseSigns={() => void useAttentionStore.getState().startCapture()} />);
+    render(<ConversationPanel onRespond={() => undefined} onUseSigns={() => undefined} />);
 
-    await user.click(screen.getByRole("button", { name: /Usar señas/ }));
     const proposal = await screen.findByRole("textbox", { name: "Editar propuesta" });
     await user.clear(proposal);
     await user.type(proposal, "Necesito orientación para mi trámite.");
@@ -60,29 +64,47 @@ describe("ConversationPanel", () => {
     expect(useAttentionStore.getState().captureStatus).toBe("confirmed");
   });
 
-  it("shows a simulated error and lets the user retry successfully", async () => {
+  it("lets the user discard a model candidate", async () => {
+    act(() => {
+      useAttentionStore.getState().startContinuousCapture();
+      useAttentionStore.getState().appendModelCapture("YO", 0.9);
+      useAttentionStore.getState().stopContinuousCapture();
+    });
     const user = userEvent.setup();
-    act(() => useAttentionStore.getState().setFailNextRecognition(true));
-    render(<ConversationPanel onRespond={() => undefined} onUseSigns={() => void useAttentionStore.getState().startCapture()} />);
+    render(<ConversationPanel onRespond={() => undefined} onUseSigns={() => undefined} />);
 
-    await user.click(screen.getByRole("button", { name: /Usar señas/ }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("No se pudo preparar una interpretación de demostración.");
-    await user.click(screen.getByRole("button", { name: "Reintentar" }));
-    await waitFor(() => expect(useAttentionStore.getState().captureStatus).toBe("reviewing"));
-    expect(screen.getByRole("textbox", { name: "Editar propuesta" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Descartar" }));
+    expect(useAttentionStore.getState().captureStatus).toBe("idle");
   });
 
   it("shows an experimental model result as an editable candidate with an uncalibrated score", async () => {
     act(() => {
-      useAttentionStore.getState().beginModelCapture();
-      useAttentionStore.getState().setCaptureProgress(30);
-      useAttentionStore.getState().setCaptureProcessing();
-      useAttentionStore.getState().completeModelCapture("HOLA", 0.87);
+      useAttentionStore.getState().startContinuousCapture();
+      useAttentionStore.getState().appendModelCapture("HOLA", 0.87);
+      useAttentionStore.getState().stopContinuousCapture();
     });
     render(<ConversationPanel onRespond={() => undefined} onUseSigns={() => undefined} />);
 
     expect(screen.getByRole("textbox", { name: "Editar propuesta" })).toHaveValue("HOLA");
     expect(screen.getByText(/puntuación softmax 87.0% \(no calibrada\)/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
+  });
+
+  it("accumulates signs in an editable live transcript and stops for review", async () => {
+    act(() => {
+      useAttentionStore.getState().startContinuousCapture();
+      useAttentionStore.getState().appendModelCapture("HOLA", 0.87);
+      useAttentionStore.getState().appendModelCapture("M", 0.81);
+      useAttentionStore.getState().appendModelCapture("U", 0.79);
+    });
+    const user = userEvent.setup();
+    render(<ConversationPanel onRespond={() => undefined} onUseSigns={() => undefined} />);
+
+    expect(screen.getByRole("textbox", { name: "Editar transcripción en vivo" })).toHaveValue("HOLA MU");
+
+    await user.click(screen.getByRole("button", { name: "Detener y revisar" }));
+
+    expect(useAttentionStore.getState().captureStatus).toBe("reviewing");
+    expect(screen.getByRole("textbox", { name: "Editar propuesta" })).toHaveValue("HOLA MU");
   });
 });

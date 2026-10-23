@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Camera, CheckCheck, Info, MessageCircle, Keyboard, RotateCcw, ShieldCheck, UserRound, X } from "lucide-react";
+import { Camera, CheckCheck, Info, MessageCircle, Keyboard, ShieldCheck, Square, UserRound, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { useAttentionStore } from "@/features/attention/application/attention-store";
@@ -17,8 +17,8 @@ function getMessageSourceLabel(source: ConversationMessage["source"]): string {
     case "reviewed-sign": return "seña revisada por personal";
     case "frequent-phrase": return "frase frecuente";
     case "dictation": return "dictado del navegador";
-    case "demo": return "demostración";
     case "typed": return "texto";
+    default: return "origen no especificado";
   }
 }
 
@@ -28,13 +28,13 @@ export function ConversationPanel({ onRespond, onUseSigns }: ConversationPanelPr
   const captureText = useAttentionStore((state) => state.captureText);
   const captureScore = useAttentionStore((state) => state.captureScore);
   const captureProgress = useAttentionStore((state) => state.captureProgress);
-  const captureError = useAttentionStore((state) => state.captureError);
+  const continuousCapture = useAttentionStore((state) => state.continuousCapture);
   const confirmCapture = useAttentionStore((state) => state.confirmCapture);
   const isSaving = useAttentionStore((state) => state.isSaving);
   const setCaptureText = useAttentionStore((state) => state.setCaptureText);
   const cancelCapture = useAttentionStore((state) => state.cancelCapture);
-  const retryCapture = useAttentionStore((state) => state.retryCapture);
   const clearCapture = useAttentionStore((state) => state.clearCapture);
+  const stopContinuousCapture = useAttentionStore((state) => state.stopContinuousCapture);
   const records = useAttentionStore((state) => state.records);
   const activeRecordId = useAttentionStore((state) => state.activeRecordId);
   const sessionActive = records.find((record) => record.id === activeRecordId)?.status === "active";
@@ -67,7 +67,7 @@ export function ConversationPanel({ onRespond, onUseSigns }: ConversationPanelPr
           <li className="conversation-empty">
             <MessageCircle size={23} aria-hidden="true" />
             <strong>La conversación comienza aquí</strong>
-            <span>Captura una seña con el modelo experimental o escribe una respuesta.</span>
+            <span>Inicia el reconocimiento continuo o escribe una respuesta.</span>
           </li>
         ) : messages.map((message) => {
           const isCitizen = message.sender === "citizen";
@@ -95,14 +95,40 @@ export function ConversationPanel({ onRespond, onUseSigns }: ConversationPanelPr
         })}
       </ol>
 
-      {captureStatus === "capturing" || captureStatus === "processing" ? (
-        <div className="capture-progress" role="status">
-          <span className="spinner" aria-hidden="true" />
-          {captureStatus === "capturing"
-            ? captureProgress > 0
-              ? `Capturando secuencia LSB · ${captureProgress}/30 fotogramas…`
-              : "Preparando una captura de demostración…"
-            : "Clasificando la secuencia localmente…"}
+      {continuousCapture ? (
+        <div className="message-review message-review--live" aria-labelledby="live-review-title">
+          <div className="review-title-row">
+            <div>
+              <span className="live-status-dot" aria-hidden="true" />
+              <strong id="live-review-title">Transcripción en vivo</strong>
+            </div>
+            <span>
+              {captureStatus === "processing"
+                ? "Clasificando…"
+                : captureProgress > 0
+                  ? `Capturando ${captureProgress}/30…`
+                  : "Esperando señas…"}
+            </span>
+          </div>
+          <label className="sr-only" htmlFor="live-capture-proposal">Editar transcripción en vivo</label>
+          <textarea
+            id="live-capture-proposal"
+            value={captureText}
+            maxLength={500}
+            placeholder="Las señas reconocidas aparecerán aquí."
+            onChange={(event) => setCaptureText(event.currentTarget.value)}
+          />
+          <p className="help-text">
+            Las etiquetas estables se agregan automáticamente. Detén el reconocimiento para revisar y confirmar el mensaje.
+            {captureScore === null
+              ? ""
+              : ` Última puntuación softmax ${(captureScore * 100).toFixed(1)}% (no calibrada).`}
+          </p>
+          <div className="review-actions">
+            <Button variant="secondary" size="small" onClick={stopContinuousCapture}>
+              <Square size={13} fill="currentColor" aria-hidden="true" /> Detener y revisar
+            </Button>
+          </div>
         </div>
       ) : null}
 
@@ -116,27 +142,13 @@ export function ConversationPanel({ onRespond, onUseSigns }: ConversationPanelPr
           <textarea id="capture-proposal" value={captureText} maxLength={500} onChange={(event) => setCaptureText(event.currentTarget.value)} />
           <p className="help-text">
             {captureScore === null
-              ? "Resultado fijo de demostración; no es reconocimiento ni traducción LSB validada."
+              ? "Texto revisable; no es una traducción LSB validada."
               : `Modelo LSB de referencia v4 · puntuación softmax ${(captureScore * 100).toFixed(1)}% (no calibrada). Es una etiqueta candidata, no una traducción validada.`}
           </p>
           <div className="review-actions">
             <Button variant="secondary" size="small" onClick={cancelCapture}><X size={14} aria-hidden="true" /> Descartar</Button>
-            {captureScore === null ? (
-              <Button variant="secondary" size="small" onClick={() => void retryCapture()}><RotateCcw size={14} aria-hidden="true" /> Reintentar</Button>
-            ) : (
-              <span className="help-text">Para repetir, captura otra secuencia con el botón de cámara.</span>
-            )}
+            <span className="help-text">La transcripción sigue siendo editable; confírmala cuando esté lista.</span>
             <Button variant="primary" size="small" onClick={() => void confirmCapture()} disabled={isSaving}><ShieldCheck size={14} aria-hidden="true" /> {isSaving ? "Guardando…" : "Confirmar mensaje"}</Button>
-          </div>
-        </div>
-      ) : null}
-
-      {captureStatus === "error" ? (
-        <div className="capture-error" role="alert">
-          <div><strong>No se pudo preparar la propuesta</strong><span>{captureError}</span></div>
-          <div className="review-actions">
-            <Button variant="secondary" size="small" onClick={cancelCapture}><X size={14} aria-hidden="true" /> Cancelar</Button>
-            <Button variant="primary" size="small" onClick={() => void retryCapture()}><RotateCcw size={14} aria-hidden="true" /> Reintentar</Button>
           </div>
         </div>
       ) : null}
@@ -150,7 +162,7 @@ export function ConversationPanel({ onRespond, onUseSigns }: ConversationPanelPr
 
       <footer className="conversation-actions">
         <Button variant="secondary" size="large" onClick={onUseSigns} disabled={!sessionActive}>
-          <CameraActionIcon /> <span><strong>Usar señas</strong><small>Activar cámara para capturar</small></span>
+          <CameraActionIcon /> <span><strong>Usar señas</strong><small>Preparar cámara para señas</small></span>
         </Button>
         <Button variant="secondary" size="large" onClick={onRespond} disabled={!sessionActive}>
           <Keyboard size={20} aria-hidden="true" /> <span><strong>Responder</strong><small>Escribir o dictar</small></span>
@@ -178,7 +190,7 @@ export function ConversationPanel({ onRespond, onUseSigns }: ConversationPanelPr
         title="Revisión de la conversación"
         description="Los mensajes se guardan en Supabase asociados a la cuenta del personal."
       >
-        <p>El modelo de referencia propone una etiqueta de un vocabulario limitado; la demo usa una frase fija. En ambos casos el personal debe revisar y confirmar el texto. Ninguno constituye una traducción LSB validada.</p>
+        <p>El modelo de referencia propone etiquetas de un vocabulario limitado y las acumula en un borrador. El personal debe revisar, corregir y confirmar el texto; no constituye una traducción LSB validada.</p>
       </Dialog>
     </section>
   );

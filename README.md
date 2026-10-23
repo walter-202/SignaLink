@@ -4,7 +4,7 @@
 
 > Proyecto universitario de ingeniería de software, accesibilidad e inteligencia artificial para facilitar la comunicación bidireccional durante trámites presenciales.
 
-**Estado:** MVP en integración: ya permite iniciar sesión con Supabase Auth y guardar atenciones, conversaciones y observaciones en PostgreSQL con RLS por cuenta. La atención incluye landmarks locales y un clasificador ONNX LSB experimental de vocabulario limitado, seleccionable en los ajustes de captura; la demo fija sigue disponible. Ninguna propuesta se considera traducción validada. El avatar es ilustrativo y no traduce señas.
+**Estado:** MVP en integración: ya permite iniciar sesión con Supabase Auth y guardar atenciones, conversaciones y observaciones en PostgreSQL con RLS por cuenta. La atención incluye landmarks locales y un clasificador ONNX LSB experimental de vocabulario limitado que se carga automáticamente; el modo continuo segmenta por movimiento, acumula etiquetas en un borrador editable y exige una confirmación humana por frase. Ninguna propuesta se considera traducción validada. El avatar es ilustrativo y no traduce señas.
 
 **Nombre anterior:** SignaLink.
 
@@ -12,7 +12,7 @@
 
 **Arquitectura prevista:** PWA modular, reconocimiento mediante modelos intercambiables e inferencia local cuando sea viable.
 
-La implementación actual está en [`apps/web`](apps/web/README.md). Incluye `/login`, `/atender` y `/historial`, cámara con procesamiento local, selección de demo o modelo LSB experimental, revisión manual de propuestas, respuestas y filtros sobre registros persistidos. Las cuentas se crean desde Supabase Auth; cada cuenta solo puede acceder a sus propios registros.
+La implementación actual está en [`apps/web`](apps/web/README.md). Incluye `/login`, `/atender` y `/historial`, cámara con procesamiento local, captura LSB continua experimental con ONNX, revisión manual de propuestas, respuestas y filtros sobre registros persistidos. Las cuentas se crean desde Supabase Auth; cada cuenta solo puede acceder a sus propios registros.
 
 ---
 
@@ -154,7 +154,7 @@ flowchart TB
 
 La interfaz no debe depender directamente de los formatos de tensor ni de la arquitectura específica del modelo.
 
-El dominio de atención debe continuar funcionando con modelos simulados cuando no exista un modelo real disponible.
+El dominio de atención no debe depender de ONNX, MediaPipe ni de los formatos de tensor del modelo; la UI solo consume etiquetas candidatas y mantiene la confirmación humana.
 
 ---
 

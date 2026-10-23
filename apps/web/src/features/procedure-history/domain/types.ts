@@ -8,7 +8,7 @@ export interface ConversationMessage {
   text: string;
   time: string;
   state: MessageState;
-  source: "reviewed-sign" | "typed" | "frequent-phrase" | "dictation" | "demo";
+  source: "reviewed-sign" | "typed" | "frequent-phrase" | "dictation";
 }
 
 export interface HistoryRecord {

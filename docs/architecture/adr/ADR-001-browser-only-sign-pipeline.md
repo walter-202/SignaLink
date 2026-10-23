@@ -30,13 +30,17 @@ Ventana temporal de 30 fotogramas
    ↓
 Clasificador ONNX Runtime Web
    ↓
-Etiqueta candidata + puntuación + estado de revisión
+Etiqueta candidata + puntuación
+   ↓
+Borrador acumulado y editable
+   ↓ revisión humana
+Mensaje confirmado por frase
 ```
 
 ### Estado de implementación
 
-- **Implementado:** carga diferida de `HolisticLandmarker`, overlay de pose/manos, extracción de 138 features, buffer explícito de 30 fotogramas, carga opcional del ONNX LSB v4, ejecución local con WASM, SHA-256 del artefacto, etiquetas, umbral inicial de abstención y borrador revisable.
-- **Pendiente:** verificar paridad de features con secuencias autorizadas, medir tiempo/memoria en equipos objetivo, calibrar la abstención con datos representativos, mover inferencia a worker si el perfil lo requiere, y diseñar reconocimiento continuo.
+- **Implementado:** carga automática de `HolisticLandmarker` y del ONNX LSB v4 al abrir el panel, overlay de pose/manos, extracción de 138 features, segmentación continua por movimiento, buffer de 30 fotogramas, ejecución local con WASM, SHA-256 del artefacto, etiquetas, umbral inicial de abstención, borrador acumulado y confirmación humana por frase.
+- **Pendiente:** verificar paridad de features con secuencias autorizadas, medir tiempo/memoria/fps en equipos objetivo, calibrar la abstención y la segmentación con datos representativos, y mover inferencia a worker si el perfil lo requiere.
 
 ### Landmarks
 
@@ -44,7 +48,7 @@ Etiqueta candidata + puntuación + estado de revisión
 - Ejecutar con `delegate: "GPU"` cuando esté disponible y reintentar con `delegate: "CPU"` si falla.
 - Considerar la aceleración de MediaPipe como WASM/GPU del navegador; no se asume que MediaPipe use WebGPU.
 - Extraer pose, mano izquierda y mano derecha. La cara queda disponible para una fase posterior de marcadores no manuales, pero no se usa en el primer clasificador.
-- Procesar como máximo a 15 fotogramas por segundo en el hilo principal para el prototipo. La ejecución en un worker queda como optimización posterior.
+- Procesar los landmarks a intervalos de 33 ms (~30 fps) mientras la vista previa está activa, para aproximar la cadencia del corpus de referencia. Medir el coste en móviles y reducirlo fuera de la captura si es necesario. La ejecución en un worker queda como optimización posterior.
 
 ### Features
 
@@ -64,10 +68,10 @@ La extracción debe ser una función pura, probada con fixtures y separada del a
 - Usar ONNX Runtime Web para el modelo de secuencia.
 - Usar WASM para el modelo pequeño de referencia y medir el pipeline completo antes de añadir WebGPU; ONNX Runtime recomienda comparar por carga y dispositivo.
 - No importar ONNX, MediaPipe ni tensores desde componentes React.
-- La ventana inicial es de 30 fotogramas (~2 s a 15 FPS). Se clasifica una ventana por captura; la segmentación y el reconocimiento continuo se posponen.
+- El segmentador detecta movimiento, recoge 30 fotogramas (~1 s a 30 fps), clasifica un segmento por vez y aplica un cooldown antes de buscar la siguiente seña. Las etiquetas aceptadas se acumulan en un borrador editable; una frase se guarda solo tras confirmación humana.
 - El adaptador devuelve etiqueta y puntuación softmax; el UI la llama “puntuación”, no confianza calibrada. El umbral de 0.50 es heredado de la demo upstream, no validado para uso general.
 - El modelo `model_transformer_enco_v4.onnx` de Villca Villegas está versionado con SHA-256 y atribución MIT en `apps/web/public/models/lsb-reference-v4/`. El repo no documenta por separado la procedencia/licencia del corpus y no publica latencia web.
-- ONNX Runtime Web se importa solo si el personal selecciona ese modelo. El `.wasm` de 13.6 MiB y el `.mjs` se copian al `public/` ignorado desde la versión fijada del paquete antes de dev/build; el modelo pesa 6.9 MiB. Así no depende de jsDelivr y ambos pueden quedar en caché del mismo origen.
+- ONNX Runtime Web se importa dinámicamente al abrir el panel de atención. El `.wasm` de 13.6 MiB y el `.mjs` se copian al `public/` ignorado desde la versión fijada del paquete antes de dev/build; el modelo pesa 6.9 MiB. Así no depende de jsDelivr y ambos pueden quedar en caché del mismo origen.
 
 ### Privacidad y persistencia
 
@@ -109,8 +113,8 @@ No bloquea el prototipo. Primero se valida el contrato de landmarks y el adaptad
 
 ### Costos y riesgos
 
-- Primer uso del clasificador descarga aproximadamente 6.9 MiB de modelo y 13.6 MiB de runtime WASM; el modelo se carga de forma explícita y los recursos locales pueden quedar en caché.
-- La ventana de captura por sí sola ocupa ~2 segundos a 15 FPS, antes de contar la inferencia; no garantiza conversación fluida.
+- Primer uso del clasificador descarga aproximadamente 6.9 MiB de modelo y 13.6 MiB de runtime WASM; el modelo se carga automáticamente al abrir el panel y los recursos locales pueden quedar en caché.
+- Cada seña requiere un segmento de ~1 segundo a 30 FPS antes de la inferencia; el solapamiento, las pausas y el rendimiento de MediaPipe condicionan la fluidez. No es traducción de frases continuas.
 - El modelo de referencia cubre 58 clases y condiciones de captura limitadas; no representa LSB general ni traducción libre.
 - La paridad entre MediaPipe Python y MediaPipe Web debe verificarse con fixtures antes de confiar en las predicciones.
 - El procesamiento en el hilo principal puede afectar la UI; se debe medir y migrar a worker si es necesario.
@@ -121,7 +125,7 @@ No bloquea el prototipo. Primero se valida el contrato de landmarks y el adaptad
 1. **Landmarks locales:** cargar Holistic, dibujar overlay, extraer las 138 features y exponer estado/errores.
 2. **Clasificador aislado (baseline implementado):** carga explícita del ONNX local, ventana de 30 fotogramas y etiquetas candidatas.
 3. **Evaluación:** benchmark por clase y participante, latencia, memoria y paridad con Python.
-4. **Continuo:** segmentación, ventanas consistentes, marcadores no manuales y abstención calibrada.
+4. **Continuo (baseline implementado):** segmentación por movimiento, ventanas de 30 fotogramas a ~30 fps, borrador acumulado y confirmación por frase; faltan calibración, benchmark y marcadores no manuales.
 5. **Modelo LSB propio:** corpus autorizado y entrenamiento/comparación TCN vs. GRU; catálogo versionado después de validar licencia y métricas.
 
 ## Criterios de aceptación
@@ -132,6 +136,7 @@ No bloquea el prototipo. Primero se valida el contrato de landmarks y el adaptad
 - La UI distingue carga, listo, error y detección sin bloquear la captura existente.
 - No se envía video ni landmarks a la red.
 - Un resultado del clasificador se presenta como candidato revisable, nunca como traducción confirmada.
+- El modo continuo no guarda mensajes automáticamente; la acumulación vive en un borrador y cada frase requiere confirmación humana.
 
 ## Fuentes
 
