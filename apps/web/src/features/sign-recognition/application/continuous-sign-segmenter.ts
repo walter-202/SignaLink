@@ -12,7 +12,7 @@ export interface ContinuousSignSegmenterOptions {
 export type ContinuousSignSegmenterUpdate =
   | { kind: "waiting" }
   | { kind: "collecting"; progress: number }
-  | { kind: "ready"; sequence: Float32Array[]; visibleHandFrames: number };
+  | { kind: "ready"; sequence: Float32Array[]; visibleHandFrames: number; startedAtMs: number };
 
 type SegmenterPhase = "waiting" | "collecting" | "cooling";
 
@@ -65,6 +65,8 @@ export class ContinuousSignSegmenter {
   private motionStreak = 0;
   private restStartedAt: number | null = null;
   private cooldownStartedAt: number | null = null;
+  private previousAtMs = 0;
+  private startedAtMs = 0;
 
   constructor(options: ContinuousSignSegmenterOptions = {}) {
     this.sequenceLength = options.sequenceLength ?? DEFAULTS.sequenceLength;
@@ -85,6 +87,8 @@ export class ContinuousSignSegmenter {
     this.motionStreak = 0;
     this.restStartedAt = null;
     this.cooldownStartedAt = null;
+    this.previousAtMs = 0;
+    this.startedAtMs = 0;
   }
 
   beginCooldown(now: number): void {
@@ -98,6 +102,7 @@ export class ContinuousSignSegmenter {
 
   push(landmarks: LandmarkFrame, features: Float32Array, now: number): ContinuousSignSegmenterUpdate {
     const previousFeatures = this.previousFeatures;
+    const previousAtMs = this.previousAtMs;
     const previousVisibleHands = this.previousVisibleHands;
     const motion = measureHandMotion(this.previousLandmarks, landmarks);
     const visibleHands = hasVisibleHands(landmarks);
@@ -105,6 +110,7 @@ export class ContinuousSignSegmenter {
     this.previousLandmarks = landmarks;
     this.previousFeatures = new Float32Array(features);
     this.previousVisibleHands = visibleHands;
+    this.previousAtMs = now;
 
     if (this.phase === "collecting") {
       this.frames.push(new Float32Array(features));
@@ -114,6 +120,7 @@ export class ContinuousSignSegmenter {
           kind: "ready",
           sequence: this.frames.slice(-this.sequenceLength),
           visibleHandFrames: this.visibleHandFrames,
+          startedAtMs: this.startedAtMs,
         };
       }
       return { kind: "collecting", progress: this.frames.length };
@@ -151,6 +158,7 @@ export class ContinuousSignSegmenter {
     if (this.motionStreak < this.triggerFrames) return { kind: "waiting" };
 
     this.phase = "collecting";
+    this.startedAtMs = previousFeatures && previousVisibleHands ? previousAtMs : now;
     this.frames = [];
     this.visibleHandFrames = 0;
     this.motionStreak = 0;

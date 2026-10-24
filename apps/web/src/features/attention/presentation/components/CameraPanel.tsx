@@ -19,12 +19,14 @@ import { Dialog } from "@/components/ui/Dialog";
 import { useAttentionStore } from "@/features/attention/application/attention-store";
 import type { CameraStatus, UseCameraReturn } from "@/features/camera";
 import {
-  ContinuousSignSegmenter,
   LandmarkOverlay,
   useLandmarkDetection,
   LSB_SEQUENCE_LENGTH,
 } from "@/features/sign-recognition";
 import { LSB_REFERENCE_V4, formatMiB } from "@/features/sign-recognition/domain/model-catalog";
+import { ContinuousRecognitionPipeline } from "@/features/sign-recognition/application/continuous-recognition-pipeline";
+import { RecognitionPerformance } from "@/features/sign-recognition/application/recognition-performance";
+import { RecognitionDiagnostics } from "@/features/sign-recognition/presentation/components/RecognitionDiagnostics";
 import type { SignClassifier } from "@/features/sign-recognition/application/ports/sign-classifier";
 
 const landmarksEnabledByDefault = process.env.NEXT_PUBLIC_SIGN_LANDMARKS !== "off";
@@ -46,13 +48,12 @@ export function CameraPanel({ camera }: CameraPanelProps) {
   const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const classifierRef = useRef<SignClassifier | null>(null);
-  const segmenterRef = useRef(new ContinuousSignSegmenter());
-  const inferenceBusyRef = useRef(false);
+  const pipelineRef = useRef<ContinuousRecognitionPipeline | null>(null);
+  const [metrics] = useState(() => new RecognitionPerformance());
   const lastAcceptedRef = useRef<{ label: string; at: number } | null>(null);
   const lastProgressRef = useRef(0);
   const previousContinuousRef = useRef(false);
   const preserveCaptureErrorRef = useRef(false);
-  const captureGenerationRef = useRef(0);
   const previousStatusRef = useRef<CameraStatus>("idle");
   const captureStatus = useAttentionStore((state) => state.captureStatus);
   const captureProgress = useAttentionStore((state) => state.captureProgress);
@@ -68,10 +69,15 @@ export function CameraPanel({ camera }: CameraPanelProps) {
   const records = useAttentionStore((state) => state.records);
   const activeRecordId = useAttentionStore((state) => state.activeRecordId);
   const sessionActive = records.find((record) => record.id === activeRecordId)?.status === "active";
+  const handleLandmarkFrame = useCallback((...args: Parameters<ContinuousRecognitionPipeline["push"]>) => {
+    pipelineRef.current?.push(...args);
+  }, []);
   const landmarkDetection = useLandmarkDetection({
     video: videoElement,
     enabled: camera.isActive && landmarksEnabled,
     frameIntervalMs: continuousFrameIntervalMs,
+    onFrame: handleLandmarkFrame,
+    metrics,
   });
   const canStartRecognition = sessionActive
     && camera.isActive
@@ -87,17 +93,59 @@ export function CameraPanel({ camera }: CameraPanelProps) {
   useEffect(() => {
     let cancelled = false;
     let classifier: SignClassifier | null = null;
-    const segmenter = segmenterRef.current;
+    const loadingStartedAt = performance.now();
 
     void import("@/features/sign-recognition/infrastructure/onnx-lsb-classifier")
       .then(async ({ OnnxLsbReferenceClassifier }) => {
         if (cancelled) return;
-        classifier = new OnnxLsbReferenceClassifier();
+        classifier = new OnnxLsbReferenceClassifier(metrics);
         classifierRef.current = classifier;
         await classifier.initialize((message) => {
           if (!cancelled) setModelLoadDetail(message);
         });
         if (!cancelled) {
+          metrics.record("modelLoadMs", performance.now() - loadingStartedAt);
+          pipelineRef.current = new ContinuousRecognitionPipeline({
+            classifier,
+            performance: metrics,
+            onProgress: (progress) => {
+              if (lastProgressRef.current === progress) return;
+              // Publish progress roughly every three frames; recognition still receives every frame.
+              if (progress !== 0 && lastProgressRef.current !== 0 && Math.abs(progress - lastProgressRef.current) < 3) return;
+              lastProgressRef.current = progress;
+              setCaptureProgress(progress);
+            },
+            onProcessing: setCaptureProcessing,
+            onPrediction: (prediction) => {
+              if (!useAttentionStore.getState().continuousCapture) return;
+              if (!Number.isFinite(prediction.confidence) || prediction.confidence < LSB_REFERENCE_V4.confidenceThreshold || prediction.label.length === 0) {
+                metrics.increment("uncertain");
+                resumeContinuousCapture();
+                setModelCaptureError(`No se reconoció una etiqueta por encima del umbral de 50% (puntuación ${Number.isFinite(prediction.confidence) ? `${(prediction.confidence * 100).toFixed(1)}%` : "no válida"}). Repite la seña con manos y torso visibles.`);
+                return;
+              }
+              const now = performance.now();
+              const previous = lastAcceptedRef.current;
+              if (previous && previous.label === prediction.label && now - previous.at < duplicateLabelWindowMs) {
+                metrics.increment("duplicates");
+                resumeContinuousCapture();
+                return;
+              }
+              lastAcceptedRef.current = { label: prediction.label, at: now };
+              metrics.increment("accepted");
+              setModelCaptureError(null);
+              appendModelCapture(prediction.label, prediction.confidence);
+            },
+            onError: (message, code) => {
+              resumeContinuousCapture();
+              setModelCaptureError(message);
+              if (code === "overloaded" || code === "stale") {
+                pipelineRef.current?.stop();
+                preserveCaptureErrorRef.current = true;
+                stopContinuousCapture();
+              }
+            },
+          });
           setModelLoadStatus("ready");
           setModelLoadDetail("Modelo cargado y verificado localmente.");
         }
@@ -112,9 +160,8 @@ export function CameraPanel({ camera }: CameraPanelProps) {
 
     return () => {
       cancelled = true;
-      captureGenerationRef.current += 1;
-      inferenceBusyRef.current = false;
-      segmenter.reset();
+      pipelineRef.current?.stop();
+      pipelineRef.current = null;
       const status = useAttentionStore.getState();
       if (status.continuousCapture || status.captureStatus === "capturing" || status.captureStatus === "processing") {
         cancelCapture();
@@ -122,105 +169,16 @@ export function CameraPanel({ camera }: CameraPanelProps) {
       if (classifierRef.current === classifier) classifierRef.current = null;
       classifier?.close();
     };
-  }, [modelLoadAttempt, cancelCapture]);
+  }, [modelLoadAttempt, cancelCapture, metrics, appendModelCapture, resumeContinuousCapture, setCaptureProgress, setCaptureProcessing, stopContinuousCapture]);
 
   useEffect(() => {
-    if (!continuousCapture || !landmarkDetection.landmarks || !landmarkDetection.features) return;
-    if (inferenceBusyRef.current) return;
-
-    const update = segmenterRef.current.push(
-      landmarkDetection.landmarks,
-      landmarkDetection.features,
-      performance.now(),
-    );
-
-    if (update.kind === "waiting") {
-      if (lastProgressRef.current !== 0) {
-        lastProgressRef.current = 0;
-        setCaptureProgress(0);
-      }
-      return;
-    }
-
-    if (update.kind === "collecting") {
-      if (lastProgressRef.current !== update.progress) {
-        lastProgressRef.current = update.progress;
-        setCaptureProgress(update.progress);
-      }
-      return;
-    }
-
-    const classifier = classifierRef.current;
-    if (!classifier) {
-      preserveCaptureErrorRef.current = true;
-      stopContinuousCapture();
-      setModelCaptureError("El modelo se cerró antes de completar la captura. Vuelve a cargarlo.");
-      return;
-    }
-
-    if (update.visibleHandFrames < LSB_SEQUENCE_LENGTH / 2) {
-      segmenterRef.current.beginCooldown(performance.now());
-      resumeContinuousCapture();
-      setModelCaptureError("No hubo manos visibles en suficientes fotogramas. Centra las manos y vuelve a intentarlo.");
-      return;
-    }
-
-    const generation = captureGenerationRef.current;
-    inferenceBusyRef.current = true;
-    lastProgressRef.current = 0;
-    setCaptureProcessing();
-
-    void classifier.classify(update.sequence)
-      .then((prediction) => {
-        if (generation !== captureGenerationRef.current) return;
-        if (!useAttentionStore.getState().continuousCapture) return;
-
-        segmenterRef.current.beginCooldown(performance.now());
-
-        if (!Number.isFinite(prediction.confidence) || prediction.confidence < LSB_REFERENCE_V4.confidenceThreshold || prediction.label.length === 0) {
-          resumeContinuousCapture();
-          setModelCaptureError(
-            `No se reconoció una etiqueta por encima del umbral de 50% (puntuación ${Number.isFinite(prediction.confidence) ? `${(prediction.confidence * 100).toFixed(1)}%` : "no válida"}). Repite la seña con manos y torso visibles.`,
-          );
-          return;
-        }
-
-        const now = performance.now();
-        const previous = lastAcceptedRef.current;
-        if (previous && previous.label === prediction.label && now - previous.at < duplicateLabelWindowMs) {
-          resumeContinuousCapture();
-          return;
-        }
-
-        lastAcceptedRef.current = { label: prediction.label, at: now };
-        setModelCaptureError(null);
-        appendModelCapture(prediction.label, prediction.confidence);
-      })
-      .catch((cause: unknown) => {
-        if (generation !== captureGenerationRef.current) return;
-        segmenterRef.current.beginCooldown(performance.now());
-        if (useAttentionStore.getState().continuousCapture) resumeContinuousCapture();
-        setModelCaptureError(cause instanceof Error ? cause.message : "Falló la inferencia local.");
-      })
-      .finally(() => {
-        if (generation === captureGenerationRef.current) inferenceBusyRef.current = false;
-      });
-  }, [
-    continuousCapture,
-    landmarkDetection.features,
-    landmarkDetection.landmarks,
-    appendModelCapture,
-    resumeContinuousCapture,
-    setCaptureProgress,
-    setCaptureProcessing,
-    stopContinuousCapture,
-  ]);
+    pipelineRef.current?.stop();
+    if (useAttentionStore.getState().continuousCapture) cancelCapture();
+  }, [activeRecordId, cancelCapture]);
 
   useEffect(() => {
     if (!continuousCapture && previousContinuousRef.current) {
-      captureGenerationRef.current += 1;
-      inferenceBusyRef.current = false;
-      segmenterRef.current.reset();
+      pipelineRef.current?.stop();
       lastProgressRef.current = 0;
       if (preserveCaptureErrorRef.current) {
         preserveCaptureErrorRef.current = false;
@@ -234,9 +192,7 @@ export function CameraPanel({ camera }: CameraPanelProps) {
   useEffect(() => {
     if (!continuousCapture) return;
     if (camera.isActive && landmarksEnabled && landmarkDetection.status === "ready" && modelLoadStatus === "ready") return;
-    captureGenerationRef.current += 1;
-    inferenceBusyRef.current = false;
-    segmenterRef.current.reset();
+    pipelineRef.current?.stop();
     lastProgressRef.current = 0;
     stopContinuousCapture();
   }, [
@@ -269,20 +225,16 @@ export function CameraPanel({ camera }: CameraPanelProps) {
 
   function handleRecognitionToggle() {
     if (continuousCapture) {
-      captureGenerationRef.current += 1;
-      inferenceBusyRef.current = false;
-      segmenterRef.current.reset();
+      pipelineRef.current?.stop();
       lastProgressRef.current = 0;
       setModelCaptureError(null);
       stopContinuousCapture();
       return;
     }
 
-    if (!canStartRecognition || !classifierRef.current) return;
+    if (!canStartRecognition || !pipelineRef.current) return;
 
-    captureGenerationRef.current += 1;
-    inferenceBusyRef.current = false;
-    segmenterRef.current.reset();
+    pipelineRef.current?.start();
     lastAcceptedRef.current = null;
     lastProgressRef.current = 0;
     preserveCaptureErrorRef.current = false;
@@ -565,6 +517,7 @@ export function CameraPanel({ camera }: CameraPanelProps) {
             <p className="help-text">El modo continuo segmenta por movimiento y clasifica secuencias aisladas de 30 fotogramas a ~30 fps. No es traducción continua ni LSB general. <a href={LSB_REFERENCE_V4.sourceUrl} target="_blank" rel="noreferrer">Proyecto y licencia MIT</a>.</p>
           </div>
         </div>
+        <RecognitionDiagnostics metrics={metrics} modelId={LSB_REFERENCE_V4.id} />
         <label className="setting-row">
           <span><strong>Detectar landmarks en el navegador</strong><small>MediaPipe procesa la pose y las manos localmente; el video no se envía.</small></span>
           <input

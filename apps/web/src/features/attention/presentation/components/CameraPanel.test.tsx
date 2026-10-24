@@ -79,13 +79,20 @@ const landmarkStore = vi.hoisted(() => {
 });
 
 vi.mock("@/features/sign-recognition", async () => {
-  const { useSyncExternalStore } = await import("react");
+  const { useEffect, useSyncExternalStore } = await import("react");
   const { ContinuousSignSegmenter } = await import("@/features/sign-recognition/application/continuous-sign-segmenter");
   return {
     ContinuousSignSegmenter,
     LandmarkOverlay: () => null,
     LSB_SEQUENCE_LENGTH: 30,
-    useLandmarkDetection: () => useSyncExternalStore(landmarkStore.subscribe, landmarkStore.get),
+    useLandmarkDetection: function useDetection(options: { onFrame?: (frame: LandmarkFrame, features: Float32Array) => void }) {
+      const state = useSyncExternalStore(landmarkStore.subscribe, landmarkStore.get);
+      const { onFrame } = options;
+      useEffect(() => {
+        if (state.landmarks && state.features) onFrame?.(state.landmarks, state.features);
+      }, [state, onFrame]);
+      return state;
+    },
   };
 });
 
@@ -245,6 +252,21 @@ describe("CameraPanel continuous recognition", () => {
 
     await waitFor(() => expect(useAttentionStore.getState().captureText).toBe("HOLA "));
     expect(useAttentionStore.getState().continuousCapture).toBe(true);
+  });
+
+  it("does not append an inference that resolves after the operator stops capture", async () => {
+    let complete!: (value: { label: string; classIndex: number; confidence: number }) => void;
+    classifierMocks.classify.mockImplementationOnce(() => new Promise((resolve) => { complete = resolve; }));
+    const user = userEvent.setup();
+    render(<CameraPanel camera={camera} />);
+    await waitFor(() => expect(screen.getByText(/Modelo LSB de referencia listo/)).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: "Iniciar reconocimiento continuo" }));
+    feedSegment();
+    await waitFor(() => expect(classifierMocks.classify).toHaveBeenCalledOnce());
+    await user.click(screen.getByRole("button", { name: "Detener reconocimiento continuo" }));
+    await act(async () => { complete({ label: "HOLA", classIndex: 39, confidence: 0.91 }); });
+    expect(useAttentionStore.getState().captureText).toBe("");
+    expect(useAttentionStore.getState().continuousCapture).toBe(false);
   });
 
   it("requires resolving a pending transcript before starting another capture", async () => {

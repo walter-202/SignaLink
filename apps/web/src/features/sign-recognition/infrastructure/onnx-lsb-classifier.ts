@@ -10,6 +10,7 @@ import type {
   SignClassification,
   SignClassifier,
 } from "../application/ports/sign-classifier";
+import type { RecognitionPerformance } from "../application/recognition-performance";
 
 const WASM_ROOT = "/onnxruntime/wasm/";
 
@@ -48,6 +49,8 @@ export class OnnxLsbReferenceClassifier implements SignClassifier {
   private runtime: typeof import("onnxruntime-web/wasm") | null = null;
   private closed = false;
 
+  constructor(private readonly metrics?: RecognitionPerformance) {}
+
   async initialize(onStage?: (message: string) => void): Promise<void> {
     if (this.session) return;
     this.closed = false;
@@ -62,15 +65,20 @@ export class OnnxLsbReferenceClassifier implements SignClassifier {
     this.runtime = runtime;
 
     onStage?.(`Descargando el modelo (${(LSB_REFERENCE_V4.modelBytes / (1024 * 1024)).toFixed(1)} MiB)…`);
+    const downloadStartedAt = performance.now();
     const response = await fetch(LSB_REFERENCE_V4.modelUrl, { cache: "force-cache" });
     if (!response.ok) throw new Error(`No se pudo descargar el modelo (${response.status}).`);
     const modelBytes = new Uint8Array(await response.arrayBuffer());
+    this.metrics?.record("modelDownloadMs", performance.now() - downloadStartedAt);
     if (this.closed) return;
+    const integrityStartedAt = performance.now();
     const digest = await crypto.subtle.digest("SHA-256", modelBytes);
     const sha256 = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
     if (sha256 !== LSB_REFERENCE_V4.sha256) throw new Error("El archivo del modelo no coincide con su hash SHA-256.");
+    this.metrics?.record("modelIntegrityMs", performance.now() - integrityStartedAt);
 
     onStage?.("Inicializando el modelo LSB en este dispositivo…");
+    const sessionStartedAt = performance.now();
     const session = await runtime.InferenceSession.create(modelBytes, {
       executionProviders: ["wasm"],
       graphOptimizationLevel: "all",
@@ -85,6 +93,7 @@ export class OnnxLsbReferenceClassifier implements SignClassifier {
     }
     this.session = session;
     this.runtime = runtime;
+    this.metrics?.record("modelSessionMs", performance.now() - sessionStartedAt);
   }
 
   async classify(sequence: readonly Float32Array[]): Promise<SignClassification> {

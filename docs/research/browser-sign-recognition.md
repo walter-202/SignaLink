@@ -2,7 +2,7 @@
 
 ## Estado actual del prototipo
 
-El clasificador base se carga automáticamente al abrir la atención. Se descargan el modelo ONNX de 6.87 MiB y el runtime WASM local (13.6 MiB), se verifica el SHA-256 y se habilitan los controles cuando cámara, landmarks y modelo están listos. El modo continuo segmenta por movimiento, recoge 30 frames a intervalos de 33 ms y propone una etiqueta editable por segmento. El umbral actual de 0.50 se hereda del upstream y no está calibrado. El resultado siempre exige revisión y confirmación humana.
+El clasificador base se carga automáticamente al abrir la atención. Se descargan el modelo ONNX de 6.87 MiB y el runtime WASM local (13.6 MiB), se verifica el SHA-256 del modelo y se habilitan los controles cuando cámara, landmarks y modelo están listos. El modo continuo segmenta por movimiento, recoge 30 frames con un intervalo solicitado de 33 ms y propone una etiqueta editable por segmento. La captura continúa durante la inferencia, con una sola secuencia pendiente y controles de saturación/cancelación. Los FPS reales dependen del dispositivo. El umbral actual de 0.50 se hereda del upstream y no está calibrado. El resultado siempre exige revisión y confirmación humana. Consulta el [protocolo de rendimiento y diagnóstico local](./recognition-performance.md) para medir esta primera optimización; todavía no demuestra una reducción de latencia del 50%.
 
 El WASM de ONNX Runtime Web se copia desde la versión exacta fijada en `pnpm-lock.yaml` a `apps/web/public/onnxruntime/wasm/` antes de iniciar Next o construir. Esa carpeta es generada e ignorada por Git. El modelo, la tarjeta informativa y la licencia del upstream viven en `apps/web/public/models/lsb-reference-v4/`.
 

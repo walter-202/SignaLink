@@ -1,6 +1,7 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { RecognitionPerformance } from "../../application/recognition-performance";
 import {
   LandmarkDetectorError,
   type LandmarkDetectorErrorCode,
@@ -17,6 +18,9 @@ export interface UseLandmarkDetectionOptions {
   video: HTMLVideoElement | null;
   enabled: boolean;
   frameIntervalMs?: number;
+  previewIntervalMs?: number;
+  onFrame?: (frame: LandmarkFrame, features: Float32Array) => void;
+  metrics?: RecognitionPerformance;
 }
 
 export interface UseLandmarkDetectionReturn {
@@ -43,12 +47,17 @@ export function useLandmarkDetection({
   video,
   enabled,
   frameIntervalMs = 66,
+  previewIntervalMs = 100,
+  onFrame,
+  metrics,
 }: UseLandmarkDetectionOptions): UseLandmarkDetectionReturn {
   const createDetector = useLandmarkDetectorFactory();
   const [status, setStatus] = useState<LandmarkDetectionStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const [landmarks, setLandmarks] = useState<LandmarkFrame | null>(null);
   const [features, setFeatures] = useState<Float32Array | null>(null);
+  const onFrameRef = useRef(onFrame);
+  useEffect(() => { onFrameRef.current = onFrame; }, [onFrame]);
 
   useEffect(() => {
     let cancelled = false;
@@ -68,10 +77,14 @@ export function useLandmarkDetection({
 
     let stopped = false;
     let animationFrame = 0;
-    let lastDetectionAt = 0;
+    let lastDetectionAt = Number.NEGATIVE_INFINITY;
+    let lastPreviewAt = Number.NEGATIVE_INFINITY;
+    let previousFrameAt: number | null = null;
     let lastTimestampMs = 0;
     let lastVideoTime = -1;
     const sourceVideo = video;
+    const useVideoFrames = typeof sourceVideo.requestVideoFrameCallback === "function"
+      && typeof sourceVideo.cancelVideoFrameCallback === "function";
     const detector = createDetector();
 
     queueMicrotask(() => {
@@ -84,12 +97,22 @@ export function useLandmarkDetection({
 
     function schedule() {
       if (cancelled || stopped) return;
-      animationFrame = window.requestAnimationFrame(run);
+      animationFrame = useVideoFrames
+        ? sourceVideo.requestVideoFrameCallback(run)
+        : window.requestAnimationFrame(run);
+    }
+
+    function cancelScheduledFrame() {
+      if (useVideoFrames) {
+        sourceVideo.cancelVideoFrameCallback(animationFrame);
+      } else {
+        window.cancelAnimationFrame(animationFrame);
+      }
     }
 
     function run(now: number): void {
       if (cancelled || stopped) return;
-      animationFrame = window.requestAnimationFrame(run);
+      schedule();
 
       if (document.hidden) return;
       if (now - lastDetectionAt < frameIntervalMs) return;
@@ -102,23 +125,40 @@ export function useLandmarkDetection({
       lastTimestampMs = timestampMs;
 
       try {
+        const detectionStartedAt = performance.now();
         const frame = detector.detect(sourceVideo, timestampMs);
         if (cancelled) return;
-        setLandmarks(frame);
-        setFeatures(extractLsbFeatures(frame));
+        const detectedAt = performance.now();
+        const nextFeatures = extractLsbFeatures(frame);
+        metrics?.record("landmarkMs", detectedAt - detectionStartedAt);
+        metrics?.record("featuresMs", performance.now() - detectedAt);
+        metrics?.increment("frames");
+        if (previousFrameAt !== null && detectionStartedAt - previousFrameAt < 1_000) {
+          metrics?.record("frameIntervalMs", detectionStartedAt - previousFrameAt);
+        }
+        previousFrameAt = detectionStartedAt;
+        // Acquisition is independent of React rendering and overlay refresh frequency.
+        onFrameRef.current?.(frame, nextFeatures);
+        if (now - lastPreviewAt >= previewIntervalMs) {
+          lastPreviewAt = now;
+          setLandmarks(frame);
+          setFeatures(nextFeatures);
+        }
       } catch (cause) {
         if (cancelled) return;
         stopped = true;
-        window.cancelAnimationFrame(animationFrame);
+        cancelScheduledFrame();
         const code = cause instanceof LandmarkDetectorError ? cause.code : "inference";
         setStatus("error");
         setError(getLandmarkErrorMessage(code));
       }
     }
 
+    const loadingStartedAt = performance.now();
     void detector.initialize()
       .then(() => {
         if (cancelled) return;
+        metrics?.record("landmarkLoadMs", performance.now() - loadingStartedAt);
         setStatus("ready");
         schedule();
       })
@@ -132,10 +172,10 @@ export function useLandmarkDetection({
     return () => {
       cancelled = true;
       stopped = true;
-      window.cancelAnimationFrame(animationFrame);
+      cancelScheduledFrame();
       detector.close();
     };
-  }, [createDetector, enabled, frameIntervalMs, video]);
+  }, [createDetector, enabled, frameIntervalMs, previewIntervalMs, metrics, video]);
 
   return { status, error, landmarks, features };
 }
