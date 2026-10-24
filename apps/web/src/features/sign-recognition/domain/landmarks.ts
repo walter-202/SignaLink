@@ -12,6 +12,16 @@ export interface LandmarkFrame {
   timestampMs: number;
 }
 
+export const LSB_V4_FEATURE_CONTRACT = Object.freeze({
+  featureSchema: "lsb-v4-138-v1",
+  preprocessorId: "lsb-v4-features-v1",
+  normalization: "hand-min-xy+nose-distance+pose-angle-over-2pi-v1",
+  landmarkOrder: Object.freeze(["right-hand-xy", "right-hand-nose-distance", "pose-angles-11-to-22", "left-hand-xy", "left-hand-nose-distance"]),
+  featureCount: 138,
+});
+
+export type SignFeatureExtractor = (frame: LandmarkFrame) => Float32Array;
+
 export const LSB_SEQUENCE_LENGTH = 30;
 export const LSB_FEATURE_COUNT = 138;
 

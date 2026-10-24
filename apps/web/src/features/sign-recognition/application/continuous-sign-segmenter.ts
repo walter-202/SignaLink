@@ -70,6 +70,7 @@ export class ContinuousSignSegmenter {
 
   constructor(options: ContinuousSignSegmenterOptions = {}) {
     this.sequenceLength = options.sequenceLength ?? DEFAULTS.sequenceLength;
+    if (!Number.isInteger(this.sequenceLength) || this.sequenceLength < 2) throw new RangeError("La secuencia debe contener al menos dos fotogramas.");
     this.motionThreshold = options.motionThreshold ?? DEFAULTS.motionThreshold;
     this.restThreshold = options.restThreshold ?? DEFAULTS.restThreshold;
     this.restDurationMs = options.restDurationMs ?? DEFAULTS.restDurationMs;
@@ -170,6 +171,9 @@ export class ContinuousSignSegmenter {
     this.frames.push(new Float32Array(features));
     if (visibleHands) this.visibleHandFrames += 1;
 
+    if (this.frames.length >= this.sequenceLength) {
+      return { kind: "ready", sequence: this.frames.slice(-this.sequenceLength), visibleHandFrames: this.visibleHandFrames, startedAtMs: this.startedAtMs };
+    }
     return { kind: "collecting", progress: this.frames.length };
   }
 }

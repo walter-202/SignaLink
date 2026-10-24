@@ -7,8 +7,8 @@ import {
   type LandmarkDetectorErrorCode,
 } from "../../application/ports/landmark-detector";
 import {
-  extractLsbFeatures,
   type LandmarkFrame,
+  type SignFeatureExtractor,
 } from "../../domain/landmarks";
 import { useLandmarkDetectorFactory } from "../SignRecognitionContext";
 
@@ -21,6 +21,7 @@ export interface UseLandmarkDetectionOptions {
   previewIntervalMs?: number;
   onFrame?: (frame: LandmarkFrame, features: Float32Array) => void;
   metrics?: RecognitionPerformance;
+  extractFeatures: SignFeatureExtractor;
 }
 
 export interface UseLandmarkDetectionReturn {
@@ -50,6 +51,7 @@ export function useLandmarkDetection({
   previewIntervalMs = 100,
   onFrame,
   metrics,
+  extractFeatures,
 }: UseLandmarkDetectionOptions): UseLandmarkDetectionReturn {
   const createDetector = useLandmarkDetectorFactory();
   const [status, setStatus] = useState<LandmarkDetectionStatus>("idle");
@@ -129,7 +131,7 @@ export function useLandmarkDetection({
         const frame = detector.detect(sourceVideo, timestampMs);
         if (cancelled) return;
         const detectedAt = performance.now();
-        const nextFeatures = extractLsbFeatures(frame);
+        const nextFeatures = extractFeatures(frame);
         metrics?.record("landmarkMs", detectedAt - detectionStartedAt);
         metrics?.record("featuresMs", performance.now() - detectedAt);
         metrics?.increment("frames");
@@ -175,7 +177,7 @@ export function useLandmarkDetection({
       cancelScheduledFrame();
       detector.close();
     };
-  }, [createDetector, enabled, frameIntervalMs, previewIntervalMs, metrics, video]);
+  }, [createDetector, enabled, frameIntervalMs, previewIntervalMs, metrics, extractFeatures, video]);
 
   return { status, error, landmarks, features };
 }

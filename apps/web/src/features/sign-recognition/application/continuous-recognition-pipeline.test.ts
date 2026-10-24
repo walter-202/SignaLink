@@ -4,7 +4,7 @@ import type { SignClassification } from "./ports/sign-classifier";
 import { ContinuousRecognitionPipeline } from "./continuous-recognition-pipeline";
 import { RecognitionPerformance } from "./recognition-performance";
 
-const prediction: SignClassification = { label: "HOLA", classIndex: 39, confidence: 0.91 };
+const prediction: SignClassification = { modelId: "test-model", modelVersion: "1.0.0", margin: 0.8, decision: "candidate", label: "HOLA", classIndex: 39, confidence: 0.91 };
 
 function setup() {
   let now = 0;
@@ -15,6 +15,7 @@ function setup() {
   const onPrediction = vi.fn();
   const onError = vi.fn();
   const pipeline = new ContinuousRecognitionPipeline({
+    sequenceLength: 30,
     classifier: { classify, initialize: async () => undefined, close: () => undefined },
     performance: metrics,
     onPrediction,

@@ -12,3 +12,17 @@ export function useLandmarkDetectorFactory(): LandmarkDetectorFactory {
   }
   return factory;
 }
+
+export interface RecognitionModelSelection {
+  model: import("../application/ports/recognition-runtime").RecognitionModel;
+  models: readonly import("../domain/sign-model").SignModelManifest[];
+  selectModel: (id: string) => void;
+}
+
+export const RecognitionModelContext = createContext<RecognitionModelSelection | null>(null);
+
+export function useRecognitionModel(): RecognitionModelSelection {
+  const selection = useContext(RecognitionModelContext);
+  if (!selection) throw new Error("SignRecognitionProvider debe envolver la vista de captura.");
+  return selection;
+}

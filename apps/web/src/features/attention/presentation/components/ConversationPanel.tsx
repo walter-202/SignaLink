@@ -106,7 +106,7 @@ export function ConversationPanel({ onRespond, onUseSigns }: ConversationPanelPr
               {captureStatus === "processing"
                 ? "Clasificando…"
                 : captureProgress > 0
-                  ? `Capturando ${captureProgress}/30…`
+                  ? `Capturando ${captureProgress}%…`
                   : "Esperando señas…"}
             </span>
           </div>

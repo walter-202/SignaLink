@@ -42,7 +42,7 @@ informe. La descarga JSON es manual. No se envían métricas a Supabase ni a
 analítica. Cada etapa conserva como máximo 120 valores en memoria y exporta
 agregados: total observado, número de muestras retenidas, media, p50 y p95.
 Los percentiles usan el método de rango más próximo sobre las muestras retenidas.
-No se incluyen imágenes, landmarks, tensores, etiquetas, mensajes ni IDs de atención.
+El informe incluye ID, versión, hash del modelo, esquema de características y dimensiones de entrada para identificar el contrato medido. No se incluyen imágenes, landmarks, tensores, etiquetas, mensajes ni IDs de atención. Al cambiar de modelo se reinicia la medición y se descartan resultados tardíos del anterior.
 La memoria se libera al desmontar el panel; reiniciar la medición limpia contadores.
 
 | Medición | Qué representa |

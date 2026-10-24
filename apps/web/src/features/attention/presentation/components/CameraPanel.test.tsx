@@ -1,5 +1,10 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { SignRecognitionProvider } from "@/features/sign-recognition/presentation/SignRecognitionProvider";
+import { LSB_REFERENCE_V4 } from "@/features/sign-recognition/domain/model-catalog";
+import { extractLsbFeatures } from "@/features/sign-recognition/domain/landmarks";
+import type { RecognitionRuntime } from "@/features/sign-recognition/application/ports/recognition-runtime";
+import type { SignModelManifest } from "@/features/sign-recognition/domain/sign-model";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LandmarkFrame, LandmarkPoint } from "@/features/sign-recognition/domain/landmarks";
@@ -96,14 +101,6 @@ vi.mock("@/features/sign-recognition", async () => {
   };
 });
 
-vi.mock("@/features/sign-recognition/infrastructure/onnx-lsb-classifier", () => ({
-  OnnxLsbReferenceClassifier: class {
-    initialize = classifierMocks.initialize;
-    classify = classifierMocks.classify;
-    close = classifierMocks.close;
-  },
-}));
-
 vi.mock("@/features/attention/infrastructure/attention-repository", () => ({
   addAttentionMessage: vi.fn(),
   createAttentionRecord: vi.fn(),
@@ -188,6 +185,34 @@ const camera = {
   stop: vi.fn(),
 };
 
+const shortModel: SignModelManifest = {
+  ...LSB_REFERENCE_V4, id: "synthetic-short", version: "1.0.0", name: "Modelo de prueba corto",
+  inputShape: [1, 16, 138], confidenceThreshold: 0.8,
+};
+const testModels: readonly SignModelManifest[] = [LSB_REFERENCE_V4, shortModel];
+const runtime: RecognitionRuntime = {
+  listModels: () => testModels,
+  resolveModel(id) {
+    const manifest = testModels.find((item) => item.id === id)!;
+    return {
+      manifest,
+      extractFeatures: extractLsbFeatures,
+      createClassifier: async () => ({
+        initialize: classifierMocks.initialize,
+        close: classifierMocks.close,
+        classify: async (sequence) => {
+          const prediction = await classifierMocks.classify([...sequence]);
+          return { ...prediction, modelId: manifest.id, modelVersion: manifest.version, margin: 0.8,
+            decision: prediction.confidence >= manifest.confidenceThreshold ? "candidate" : "uncertain" };
+        },
+      }),
+    };
+  },
+};
+function renderCamera() {
+  return render(<SignRecognitionProvider runtime={runtime}><CameraPanel camera={camera} /></SignRecognitionProvider>);
+}
+
 describe("CameraPanel continuous recognition", () => {
   beforeEach(() => {
     resetStore();
@@ -199,9 +224,9 @@ describe("CameraPanel continuous recognition", () => {
 
   it("starts continuous recognition and appends a recognized sign to the transcript", async () => {
     const user = userEvent.setup();
-    render(<CameraPanel camera={camera} />);
+    renderCamera();
 
-    await waitFor(() => expect(screen.getByText(/Modelo LSB de referencia listo/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/referencia v4 listo/)).toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: "Iniciar reconocimiento continuo" }));
 
     expect(useAttentionStore.getState().continuousCapture).toBe(true);
@@ -226,9 +251,9 @@ describe("CameraPanel continuous recognition", () => {
   it("keeps recognition active and reports an uncertain sign", async () => {
     classifierMocks.classify.mockResolvedValueOnce({ label: "YO", classIndex: 43, confidence: 0.49 });
     const user = userEvent.setup();
-    render(<CameraPanel camera={camera} />);
+    renderCamera();
 
-    await waitFor(() => expect(screen.getByText(/Modelo LSB de referencia listo/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/referencia v4 listo/)).toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: "Iniciar reconocimiento continuo" }));
 
     feedSegment();
@@ -242,9 +267,9 @@ describe("CameraPanel continuous recognition", () => {
   it("accepts the model space label while keeping recognition active", async () => {
     classifierMocks.classify.mockResolvedValueOnce({ label: " ", classIndex: 38, confidence: 0.92 });
     const user = userEvent.setup();
-    render(<CameraPanel camera={camera} />);
+    renderCamera();
 
-    await waitFor(() => expect(screen.getByText(/Modelo LSB de referencia listo/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/referencia v4 listo/)).toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: "Iniciar reconocimiento continuo" }));
     useAttentionStore.setState({ captureText: "HOLA" });
 
@@ -254,12 +279,35 @@ describe("CameraPanel continuous recognition", () => {
     expect(useAttentionStore.getState().continuousCapture).toBe(true);
   });
 
+  it("switches through the injected runtime and uses a 16-frame window and its 80% threshold", async () => {
+    classifierMocks.classify.mockResolvedValueOnce({ label: "YO", classIndex: 43, confidence: 0.7 });
+    const user = userEvent.setup();
+    renderCamera();
+    await screen.findByText(/referencia v4 listo/);
+    await user.click(screen.getByRole("button", { name: "Ajustes de captura" }));
+    await user.selectOptions(screen.getByLabelText("Modelo de reconocimiento"), shortModel.id);
+    await screen.findByText(/Modelo de prueba corto listo/);
+    expect(classifierMocks.close).toHaveBeenCalledOnce();
+    await user.click(screen.getByRole("button", { name: "Cerrar ajustes" }));
+    await user.click(screen.getByRole("button", { name: "Iniciar reconocimiento continuo" }));
+    pushFrame(0.1, 0); pushFrame(0.13, 1); pushFrame(0.16, 2);
+    for (let frame = 3; frame <= 14; frame++) pushFrame(0.16, frame);
+    expect(useAttentionStore.getState().captureProgress).toBeGreaterThan(30);
+    expect(useAttentionStore.getState().captureProgress).toBeLessThan(100);
+    pushFrame(0.16, 15); pushFrame(0.16, 16);
+    expect(await screen.findByRole("alert")).toHaveTextContent("umbral de 80%");
+    expect(classifierMocks.classify.mock.calls[0]?.[0]).toHaveLength(16);
+    expect(useAttentionStore.getState().captureText).toBe("");
+    await user.click(screen.getByRole("button", { name: "Ajustes de captura" }));
+    expect(screen.getByLabelText("Modelo de reconocimiento")).toBeDisabled();
+  });
+
   it("does not append an inference that resolves after the operator stops capture", async () => {
     let complete!: (value: { label: string; classIndex: number; confidence: number }) => void;
     classifierMocks.classify.mockImplementationOnce(() => new Promise((resolve) => { complete = resolve; }));
     const user = userEvent.setup();
-    render(<CameraPanel camera={camera} />);
-    await waitFor(() => expect(screen.getByText(/Modelo LSB de referencia listo/)).toBeInTheDocument());
+    renderCamera();
+    await waitFor(() => expect(screen.getByText(/referencia v4 listo/)).toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: "Iniciar reconocimiento continuo" }));
     feedSegment();
     await waitFor(() => expect(classifierMocks.classify).toHaveBeenCalledOnce());
@@ -271,13 +319,15 @@ describe("CameraPanel continuous recognition", () => {
 
   it("requires resolving a pending transcript before starting another capture", async () => {
     useAttentionStore.setState({ captureStatus: "reviewing", captureText: "HOLA" });
-    render(<CameraPanel camera={camera} />);
+    renderCamera();
 
-    await waitFor(() => expect(screen.getByText(/Modelo LSB de referencia listo/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/referencia v4 listo/)).toBeInTheDocument());
 
     const startButton = screen.getByRole("button", { name: "Iniciar reconocimiento continuo" });
     expect(startButton).toBeDisabled();
     expect(startButton).toHaveAttribute("title", "Confirma o descarta la transcripción pendiente");
     expect(screen.getByText(/Confirma o descarta la transcripción antes de iniciar otra captura/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Ajustes de captura" }));
+    expect(screen.getByLabelText("Modelo de reconocimiento")).toBeDisabled();
   });
 });

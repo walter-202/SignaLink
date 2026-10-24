@@ -21,16 +21,15 @@ import type { CameraStatus, UseCameraReturn } from "@/features/camera";
 import {
   LandmarkOverlay,
   useLandmarkDetection,
-  LSB_SEQUENCE_LENGTH,
 } from "@/features/sign-recognition";
-import { LSB_REFERENCE_V4, formatMiB } from "@/features/sign-recognition/domain/model-catalog";
+import { formatMiB } from "@/features/sign-recognition/domain/model-catalog";
+import { useRecognitionModel } from "@/features/sign-recognition/presentation/SignRecognitionContext";
 import { ContinuousRecognitionPipeline } from "@/features/sign-recognition/application/continuous-recognition-pipeline";
 import { RecognitionPerformance } from "@/features/sign-recognition/application/recognition-performance";
 import { RecognitionDiagnostics } from "@/features/sign-recognition/presentation/components/RecognitionDiagnostics";
 import type { SignClassifier } from "@/features/sign-recognition/application/ports/sign-classifier";
 
 const landmarksEnabledByDefault = process.env.NEXT_PUBLIC_SIGN_LANDMARKS !== "off";
-const continuousFrameIntervalMs = 33;
 const duplicateLabelWindowMs = 900;
 type ModelLoadStatus = "loading" | "ready" | "error";
 
@@ -39,8 +38,12 @@ interface CameraPanelProps {
 }
 
 export function CameraPanel({ camera }: CameraPanelProps) {
+  const { model, models, selectModel } = useRecognitionModel();
+  const { manifest } = model;
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [modelLoadStatus, setModelLoadStatus] = useState<ModelLoadStatus>("loading");
+  const [loadedModelKey, setLoadedModelKey] = useState<string | null>(null);
+  const currentModelReady = modelLoadStatus === "ready" && loadedModelKey === `${manifest.id}@${manifest.version}`;
   const [modelLoadDetail, setModelLoadDetail] = useState("Preparando el motor de inferencia local…");
   const [modelLoadAttempt, setModelLoadAttempt] = useState(0);
   const [modelCaptureError, setModelCaptureError] = useState<string | null>(null);
@@ -75,7 +78,8 @@ export function CameraPanel({ camera }: CameraPanelProps) {
   const landmarkDetection = useLandmarkDetection({
     video: videoElement,
     enabled: camera.isActive && landmarksEnabled,
-    frameIntervalMs: continuousFrameIntervalMs,
+    frameIntervalMs: manifest.frameIntervalMs,
+    extractFeatures: model.extractFeatures,
     onFrame: handleLandmarkFrame,
     metrics,
   });
@@ -83,7 +87,7 @@ export function CameraPanel({ camera }: CameraPanelProps) {
     && camera.isActive
     && landmarksEnabled
     && landmarkDetection.status === "ready"
-    && modelLoadStatus === "ready"
+    && currentModelReady
     && captureStatus !== "reviewing";
   const setVideoRef = useCallback((node: HTMLVideoElement | null) => {
     videoRef.current = node;
@@ -95,10 +99,17 @@ export function CameraPanel({ camera }: CameraPanelProps) {
     let classifier: SignClassifier | null = null;
     const loadingStartedAt = performance.now();
 
-    void import("@/features/sign-recognition/infrastructure/onnx-lsb-classifier")
-      .then(async ({ OnnxLsbReferenceClassifier }) => {
-        if (cancelled) return;
-        classifier = new OnnxLsbReferenceClassifier(metrics);
+    metrics.reset();
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setModelLoadStatus("loading");
+      setModelLoadDetail("Preparando el motor de inferencia local…");
+      setModelCaptureError(null);
+    });
+    void model.createClassifier(metrics)
+      .then(async (createdClassifier) => {
+        classifier = createdClassifier;
+        if (cancelled) { classifier.close(); return; }
         classifierRef.current = classifier;
         await classifier.initialize((message) => {
           if (!cancelled) setModelLoadDetail(message);
@@ -107,21 +118,29 @@ export function CameraPanel({ camera }: CameraPanelProps) {
           metrics.record("modelLoadMs", performance.now() - loadingStartedAt);
           pipelineRef.current = new ContinuousRecognitionPipeline({
             classifier,
+            sequenceLength: manifest.inputShape[1],
             performance: metrics,
             onProgress: (progress) => {
               if (lastProgressRef.current === progress) return;
               // Publish progress roughly every three frames; recognition still receives every frame.
               if (progress !== 0 && lastProgressRef.current !== 0 && Math.abs(progress - lastProgressRef.current) < 3) return;
               lastProgressRef.current = progress;
-              setCaptureProgress(progress);
+              setCaptureProgress(Math.round(100 * progress / manifest.inputShape[1]));
             },
             onProcessing: setCaptureProcessing,
             onPrediction: (prediction) => {
               if (!useAttentionStore.getState().continuousCapture) return;
-              if (!Number.isFinite(prediction.confidence) || prediction.confidence < LSB_REFERENCE_V4.confidenceThreshold || prediction.label.length === 0) {
+              if (prediction.modelId !== manifest.id || prediction.modelVersion !== manifest.version) {
+                preserveCaptureErrorRef.current = true;
+                pipelineRef.current?.stop();
+                stopContinuousCapture();
+                setModelCaptureError("La predicción pertenece a otro modelo. Vuelve a iniciar el reconocimiento.");
+                return;
+              }
+              if (!Number.isFinite(prediction.confidence) || prediction.decision !== "candidate" || prediction.label.length === 0) {
                 metrics.increment("uncertain");
                 resumeContinuousCapture();
-                setModelCaptureError(`No se reconoció una etiqueta por encima del umbral de 50% (puntuación ${Number.isFinite(prediction.confidence) ? `${(prediction.confidence * 100).toFixed(1)}%` : "no válida"}). Repite la seña con manos y torso visibles.`);
+                setModelCaptureError(`No se reconoció una etiqueta por encima del umbral de ${Math.round(manifest.confidenceThreshold * 100)}% y el margen mínimo del modelo (puntuación ${Number.isFinite(prediction.confidence) ? `${(prediction.confidence * 100).toFixed(1)}%` : "no válida"}). Repite la seña con manos y torso visibles.`);
                 return;
               }
               const now = performance.now();
@@ -146,6 +165,7 @@ export function CameraPanel({ camera }: CameraPanelProps) {
               }
             },
           });
+          setLoadedModelKey(`${manifest.id}@${manifest.version}`);
           setModelLoadStatus("ready");
           setModelLoadDetail("Modelo cargado y verificado localmente.");
         }
@@ -169,7 +189,7 @@ export function CameraPanel({ camera }: CameraPanelProps) {
       if (classifierRef.current === classifier) classifierRef.current = null;
       classifier?.close();
     };
-  }, [modelLoadAttempt, cancelCapture, metrics, appendModelCapture, resumeContinuousCapture, setCaptureProgress, setCaptureProcessing, stopContinuousCapture]);
+  }, [model, manifest, modelLoadAttempt, cancelCapture, metrics, appendModelCapture, resumeContinuousCapture, setCaptureProgress, setCaptureProcessing, stopContinuousCapture]);
 
   useEffect(() => {
     pipelineRef.current?.stop();
@@ -191,7 +211,7 @@ export function CameraPanel({ camera }: CameraPanelProps) {
 
   useEffect(() => {
     if (!continuousCapture) return;
-    if (camera.isActive && landmarksEnabled && landmarkDetection.status === "ready" && modelLoadStatus === "ready") return;
+    if (camera.isActive && landmarksEnabled && landmarkDetection.status === "ready" && currentModelReady) return;
     pipelineRef.current?.stop();
     lastProgressRef.current = 0;
     stopContinuousCapture();
@@ -200,7 +220,7 @@ export function CameraPanel({ camera }: CameraPanelProps) {
     continuousCapture,
     landmarkDetection.status,
     landmarksEnabled,
-    modelLoadStatus,
+    currentModelReady,
     stopContinuousCapture,
   ]);
 
@@ -304,7 +324,7 @@ export function CameraPanel({ camera }: CameraPanelProps) {
                     ? captureStatus === "processing"
                       ? "Clasificando la seña en este dispositivo…"
                       : captureProgress > 0
-                        ? `Capturando ${captureProgress}/${LSB_SEQUENCE_LENGTH} fotogramas…`
+                        ? `Capturando ${captureProgress}%…`
                         : "Esperando una seña; mueve las manos o detén para revisar."
                     : captureStatus === "reviewing"
                       ? "Confirma o descarta la transcripción antes de iniciar otra captura."
@@ -321,7 +341,7 @@ export function CameraPanel({ camera }: CameraPanelProps) {
           <span className="camera-panel-icon" aria-hidden="true"><Camera size={17} /></span>
           <div>
             <h2>Captura de señas</h2>
-            <p>Cámara y clasificador LSB</p>
+            <p>Cámara y clasificador {manifest.languageCode}</p>
           </div>
         </div>
         <Button
@@ -438,7 +458,7 @@ export function CameraPanel({ camera }: CameraPanelProps) {
             {captureStatus === "processing"
               ? "Clasificando en este dispositivo…"
               : captureProgress > 0
-                ? `Capturando ${captureProgress}/${LSB_SEQUENCE_LENGTH}…`
+                ? `Capturando ${captureProgress}%…`
                 : "Esperando una seña…"}
           </span>
         ) : null}
@@ -472,8 +492,8 @@ export function CameraPanel({ camera }: CameraPanelProps) {
             {continuousCapture ? "Detener" : "Iniciar"}
           </span>
         </div>
-        <span className="lsb-badge" title="Lengua de Señas Boliviana">
-          <Hand size={15} aria-hidden="true" /> LSB
+        <span className="lsb-badge" title={manifest.language}>
+          <Hand size={15} aria-hidden="true" /> {manifest.languageCode}
         </span>
       </div>
 
@@ -481,29 +501,39 @@ export function CameraPanel({ camera }: CameraPanelProps) {
       {modelLoadStatus === "loading" ? (
         <p className="camera-model-status" role="status">{modelLoadDetail}</p>
       ) : null}
-      {modelLoadStatus === "ready" ? (
-        <p className="camera-model-status" role="status">Modelo LSB de referencia listo · inferencia local</p>
+      {currentModelReady ? (
+        <p className="camera-model-status" role="status">{manifest.name} listo · inferencia local</p>
       ) : null}
 
       <p className="camera-disclaimer">
         <ShieldCheck size={14} aria-hidden="true" />
-        Video, landmarks y clasificación se procesan en este navegador; no se graban ni se envían. El modelo v4 es experimental y su vocabulario es limitado.
+        Video, landmarks y clasificación se procesan en este navegador; no se graban ni se envían. {manifest.validationStatus === "experimental" ? "Modelo experimental; cada propuesta requiere revisión humana." : "Cada propuesta requiere revisión humana."}
       </p>
 
       <Dialog
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
         title="Ajustes de captura"
-        description="La cámara y la inferencia se ejecutan en el dispositivo; el modelo LSB se carga automáticamente."
+        description="La cámara y la inferencia se ejecutan en el dispositivo; el modelo seleccionado se carga automáticamente."
       >
         <div className="camera-settings-block">
-          <span className="field-label">Modelo de reconocimiento</span>
+          <label className="field-label" htmlFor="recognition-model">Modelo de reconocimiento</label>
+          <select
+            id="recognition-model"
+            className="native-select"
+            value={manifest.id}
+            disabled={models.length < 2 || continuousCapture || captureStatus === "reviewing" || modelLoadStatus === "loading"}
+            onChange={(event) => selectModel(event.currentTarget.value)}
+          >
+            {models.map((item) => <option key={item.id} value={item.id} disabled={!item.executionApproved}>{item.name} · v{item.version}</option>)}
+          </select>
+          <p className="help-text">{models.length < 2 ? "Solo hay un modelo disponible en esta instalación." : "Detén la captura y resuelve la transcripción antes de cambiar de modelo."}</p>
           <p className="camera-model-name">
-            <strong>{LSB_REFERENCE_V4.name}</strong> · {formatMiB(LSB_REFERENCE_V4.modelBytes)}
+            <strong>{manifest.name}</strong> · v{manifest.version} · {formatMiB(manifest.modelBytes)}
           </p>
           <div className="camera-model-load-state" aria-live="polite">
             {modelLoadStatus === "loading" ? <p className="help-text" role="status">{modelLoadDetail}</p> : null}
-            {modelLoadStatus === "ready" ? <p className="help-text" role="status">{modelLoadDetail} SHA-256 verificado. El runtime WASM también se guarda en caché del navegador.</p> : null}
+            {currentModelReady ? <p className="help-text" role="status">{modelLoadDetail} SHA-256 verificado. El runtime WASM también se guarda en caché del navegador.</p> : null}
             {modelLoadStatus === "error" ? (
               <div>
                 <p className="field-error" role="alert">{modelLoadDetail}</p>
@@ -514,10 +544,10 @@ export function CameraPanel({ camera }: CameraPanelProps) {
                 }}>Reintentar carga</Button>
               </div>
             ) : null}
-            <p className="help-text">El modo continuo segmenta por movimiento y clasifica secuencias aisladas de 30 fotogramas a ~30 fps. No es traducción continua ni LSB general. <a href={LSB_REFERENCE_V4.sourceUrl} target="_blank" rel="noreferrer">Proyecto y licencia MIT</a>.</p>
+            <p className="help-text">{manifest.task}. Intervalo solicitado: {manifest.frameIntervalMs} ms; los FPS reales dependen del equipo. Estado: {manifest.validationStatus === "experimental" ? "experimental, sin validación lingüística" : "validado según su ficha"}. <a href={manifest.sourceUrl} target="_blank" rel="noreferrer">Origen y licencia: {manifest.license}</a>.</p>
           </div>
         </div>
-        <RecognitionDiagnostics metrics={metrics} modelId={LSB_REFERENCE_V4.id} />
+        {currentModelReady ? <RecognitionDiagnostics key={`${manifest.id}@${manifest.version}`} metrics={metrics} model={manifest} /> : null}
         <label className="setting-row">
           <span><strong>Detectar landmarks en el navegador</strong><small>MediaPipe procesa la pose y las manos localmente; el video no se envía.</small></span>
           <input

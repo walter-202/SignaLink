@@ -167,7 +167,7 @@ La aplicación separa tres conceptos:
 - **Modelo:** implementación entrenada para reconocer una clase de expresiones.
 - **Motor:** tecnología encargada de ejecutar la inferencia.
 
-Los modelos compatibles se describirán mediante manifiestos versionados.
+Los modelos compatibles se describen mediante manifiestos versionados.
 
 Cada manifiesto debe declarar, como mínimo:
 
@@ -185,7 +185,9 @@ Cada manifiesto debe declarar, como mínimo:
 - Estado de homologación.
 - Limitaciones conocidas.
 
-El registro solo permitirá ejecutar adaptadores aprobados y compatibles.
+El registro solo permite ejecutar adaptadores habilitados y compatibles. La habilitación técnica no equivale a validación lingüística.
+
+La implementación inicial está documentada en [ADR-002](docs/architecture/adr/ADR-002-multi-model-runtime.md). El catálogo ejecutable incluye únicamente LSB v4, todavía experimental; la interfaz recibe el clasificador y el preprocesador mediante un puerto. El [roadmap de reconocimiento](docs/roadmap/recognition-mvp.md) define las siguientes etapas y la meta de latencia pendiente de demostrar.
 
 ### Modelos considerados
 

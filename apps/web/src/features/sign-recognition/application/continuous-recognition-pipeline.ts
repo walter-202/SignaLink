@@ -5,6 +5,7 @@ import type { RecognitionPerformance } from "./recognition-performance";
 
 interface PipelineOptions {
   classifier: SignClassifier;
+  sequenceLength: number;
   performance: RecognitionPerformance;
   onPrediction: (prediction: SignClassification) => void;
   onProgress: (progress: number) => void;
@@ -22,7 +23,7 @@ interface Segment {
 
 /** One inference in flight, one pending segment. Acquisition never waits for classification. */
 export class ContinuousRecognitionPipeline {
-  private segmenter = new ContinuousSignSegmenter();
+  private readonly segmenter: ContinuousSignSegmenter;
   private active = false;
   private generation = 0;
   private busy = false;
@@ -31,6 +32,7 @@ export class ContinuousRecognitionPipeline {
   private readonly now: () => number;
 
   constructor(private readonly options: PipelineOptions) {
+    this.segmenter = new ContinuousSignSegmenter({ sequenceLength: options.sequenceLength });
     this.now = options.now ?? (() => performance.now());
   }
 

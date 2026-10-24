@@ -23,6 +23,7 @@ interface AttentionState {
   captureStatus: CaptureStatus;
   captureText: string;
   captureScore: number | null;
+  /** Percentage (0–100), independent of the model sequence length. */
   captureProgress: number;
   continuousCapture: boolean;
   lastCaptureWasCharacter: boolean;
@@ -181,7 +182,7 @@ export const useAttentionStore = create<AttentionState>((set, get) => ({
   },
 
   setCaptureProgress: (captureProgress) => {
-    set({ captureProgress: Math.min(30, Math.max(0, Math.floor(captureProgress))) });
+    set({ captureProgress: Number.isFinite(captureProgress) ? Math.min(100, Math.max(0, Math.floor(captureProgress))) : 0 });
   },
 
   setCaptureProcessing: () => {

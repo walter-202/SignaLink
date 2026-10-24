@@ -10,6 +10,7 @@ const modules = [
   "application/continuous-sign-segmenter",
   "application/recognition-performance",
   "infrastructure/onnx-lsb-classifier",
+  "infrastructure/onnx-sequence-classifier",
   "domain/landmarks",
   "domain/model-catalog",
 ];
@@ -49,6 +50,7 @@ test("browser pipeline captures during slow synthetic inference and cancels late
     const labels: string[] = [];
     const metrics = new RecognitionPerformance();
     const pipeline = new ContinuousRecognitionPipeline({
+      sequenceLength: 30,
       classifier: {
         initialize: async () => undefined,
         close: () => undefined,
@@ -77,11 +79,11 @@ test("browser pipeline captures during slow synthetic inference and cancels late
     pipeline.start();
     feed(); feed();
     const callsWhileBusy = sequences.length;
-    resolves[0]!({ label: "SYNTHETIC_1", confidence: 1, classIndex: 0 });
+    resolves[0]!({ label: "SYNTHETIC_1", confidence: 1, classIndex: 0, modelId: "test-model", modelVersion: "1.0.0", margin: 1, decision: "candidate" });
     await Promise.resolve();
     const callsAfterResolve = sequences.length;
     pipeline.stop();
-    resolves[1]!({ label: "SYNTHETIC_2", confidence: 1, classIndex: 0 });
+    resolves[1]!({ label: "SYNTHETIC_2", confidence: 1, classIndex: 0, modelId: "test-model", modelVersion: "1.0.0", margin: 1, decision: "candidate" });
     await Promise.resolve();
     return { sequences, labels, callsWhileBusy, callsAfterResolve, measurements: metrics.snapshot() };
   });
@@ -101,9 +103,11 @@ test("real LSB ONNX loads locally with integrity verification and runs in browse
   });
   await page.goto("/login");
   const result = await page.evaluate(async () => {
-    const moduleUrl = "/__recognition-test/infrastructure/onnx-lsb-classifier";
-    const { OnnxLsbReferenceClassifier } = await import(moduleUrl) as typeof import("../../src/features/sign-recognition/infrastructure/onnx-lsb-classifier");
-    const classifier = new OnnxLsbReferenceClassifier();
+    const moduleUrl = "/__recognition-test/infrastructure/onnx-sequence-classifier";
+    const catalogUrl = "/__recognition-test/domain/model-catalog";
+    const { OnnxSequenceClassifier } = await import(moduleUrl) as typeof import("../../src/features/sign-recognition/infrastructure/onnx-sequence-classifier");
+    const { LSB_REFERENCE_V4 } = await import(catalogUrl) as typeof import("../../src/features/sign-recognition/domain/model-catalog");
+    const classifier = new OnnxSequenceClassifier(LSB_REFERENCE_V4);
     const startedAt = performance.now();
     await classifier.initialize(); // Includes the production SHA-256 check.
     const initializeMs = performance.now() - startedAt;
@@ -125,6 +129,10 @@ test("real LSB ONNX loads locally with integrity verification and runs in browse
   expect(downloads).toBe(1);
   expect(result.predictions).toHaveLength(6);
   for (const prediction of result.predictions) {
+    expect(prediction.modelId).toBe("lsb-reference-v4");
+    expect(prediction.modelVersion).toBe("4.0.0");
+    expect(["candidate", "uncertain"]).toContain(prediction.decision);
+    expect(Number.isFinite(prediction.margin)).toBe(true);
     expect(prediction.classIndex).toBeGreaterThanOrEqual(0);
     expect(prediction.classIndex).toBeLessThan(58);
     expect(Number.isFinite(prediction.confidence)).toBe(true);

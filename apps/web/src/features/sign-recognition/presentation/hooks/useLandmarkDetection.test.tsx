@@ -25,10 +25,11 @@ it("delivers every processed frame while throttling previews, and cancels on cle
   const factory = () => detector;
   const metrics = new RecognitionPerformance();
   const firstCallback = vi.fn();
+  const extractFeatures = vi.fn(() => new Float32Array([9, 8, 7]));
   const secondCallback = vi.fn();
   const wrapper = ({ children }: { children: ReactNode }) => <SignRecognitionContext.Provider value={factory}>{children}</SignRecognitionContext.Provider>;
   const { result, rerender, unmount } = renderHook(({ onFrame }) => useLandmarkDetection({
-    video, enabled: true, frameIntervalMs: 33, previewIntervalMs: 100, onFrame, metrics,
+    video, enabled: true, frameIntervalMs: 33, previewIntervalMs: 100, onFrame, metrics, extractFeatures,
   }), { wrapper, initialProps: { onFrame: firstCallback } });
   await waitFor(() => expect(result.current.status).toBe("ready"));
   function tick(now: number) {
@@ -42,6 +43,8 @@ it("delivers every processed frame while throttling previews, and cancels on cle
   tick(34);
   tick(68);
   expect(firstCallback).toHaveBeenCalledTimes(3);
+  expect(firstCallback.mock.calls[2]?.[1]).toEqual(new Float32Array([9, 8, 7]));
+  expect(extractFeatures).toHaveBeenCalledTimes(3);
   expect(result.current.landmarks).toBe(firstPreview);
   rerender({ onFrame: secondCallback });
   tick(102);

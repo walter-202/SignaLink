@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { SignModelManifest } from "../../domain/sign-model";
 import { Button } from "@/components/ui/Button";
 import type { RecognitionPerformance, RecognitionTiming } from "../../application/recognition-performance";
 
@@ -18,11 +19,15 @@ const labels: Partial<Record<RecognitionTiming, string>> = {
   segmentToPredictionMs: "Inicio de segmento → predicción",
 };
 
-export function RecognitionDiagnostics({ metrics, modelId }: { metrics: RecognitionPerformance; modelId: string }) {
+export function RecognitionDiagnostics({ metrics, model }: { metrics: RecognitionPerformance; model: SignModelManifest }) {
   const [snapshot, setSnapshot] = useState(() => metrics.snapshot());
 
   function download() {
-    const report = { modelId, ...metrics.snapshot() };
+    const report = {
+      modelId: model.id, modelVersion: model.version, modelSha256: model.sha256,
+      featureSchema: model.featureSchema, inputShape: model.inputShape,
+      runtime: model.runtime, ...metrics.snapshot(),
+    };
     const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: "application/json" }));
     const link = document.createElement("a");
     link.href = url;
