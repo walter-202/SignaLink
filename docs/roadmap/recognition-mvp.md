@@ -12,7 +12,7 @@ El protocolo inicial está en [rendimiento](../research/recognition-performance.
 | --- | --- | --- |
 | 1. Medición y captura | Diagnóstico local acotado, captura durante una inferencia pendiente, cancelación y prueba del ONNX real en WASM | Implementada: `e0f7346` |
 | 2. Modelos intercambiables | Registro versionado; contratos comprobados; clasificación, preprocesamiento y política de incertidumbre inyectados; cambio de modelo sin mezclar capturas | Infraestructura implementada y verificada con pruebas de contrato, selección, ONNX real en Chromium y build; solo v4 está instalado |
-| 3. Landmarks y arranque | Perfil de MediaPipe en equipo real; prototipo Worker con fallback; artefacto Holistic fijado por versión/hash y carga/caché medibles | Siguiente |
+| 3. Landmarks y arranque | Perfil de MediaPipe en equipo real; prototipo Worker con fallback; artefacto Holistic fijado por versión/hash y carga/caché medibles | En curso: Worker optativo, transporte acotado y diagnóstico implementados; faltan benchmark con señas y fijación del artefacto Holistic |
 | 4. Corpus y evaluación | 12–20 intenciones administrativas con expresiones LSB validadas; material autorizado; participantes separados entre entrenamiento/evaluación; anotaciones temporales | Pendiente de colaboración lingüística y muestras autorizadas |
 | 5. Modelo ligero y piloto | Comparar TCN, GRU y Conv1D+GRU; exportar ONNX; cuantizar solo si mejora velocidad/calidad; piloto supervisado y respuestas visuales validadas | Depende de la etapa 4 |
 
@@ -21,7 +21,11 @@ runtime. No sustituir LSB por pesos LSA ni tratar frases como concatenaciones
 lingüísticas de etiquetas. SignBart y las referencias de LSCh son candidatos de
 investigación, no modelos de producto instalados.
 
-## Próxima etapa: landmarks
+## Etapa actual: landmarks
+
+El prototipo y sus límites se describen en
+[Worker de landmarks](../research/landmark-worker.md). Está desactivado por
+defecto: no se promueve solo por pasar pruebas de transporte.
 
 1. Medir carga fría/caliente, FPS efectivos, p50/p95 de `landmarkMs`, intervalos de
    fotogramas, memoria y respuesta de la interfaz en escritorio de oficina.

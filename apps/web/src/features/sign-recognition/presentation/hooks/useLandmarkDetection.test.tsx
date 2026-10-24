@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { expect, it, vi } from "vitest";
 import type { LandmarkDetector } from "../../application/ports/landmark-detector";
+import type { LandmarkFrame } from "../../domain/landmarks";
 import { RecognitionPerformance } from "../../application/recognition-performance";
 import { SignRecognitionContext } from "../SignRecognitionContext";
 import { useLandmarkDetection } from "./useLandmarkDetection";
@@ -60,4 +61,44 @@ it("delivers every processed frame while throttling previews, and cancels on cle
   expect(video.cancelVideoFrameCallback).toHaveBeenCalled();
   tick(180);
   expect(detector.detect).toHaveBeenCalledTimes(4);
+});
+
+it("keeps one async detection in flight, skips stale results and ignores a result after unmount", async () => {
+  const video = document.createElement("video");
+  Object.defineProperties(video, { readyState: { value: 4 }, videoWidth: { value: 640 }, currentTime: { value: 0, writable: true } });
+  let scheduled!: VideoFrameRequestCallback;
+  video.requestVideoFrameCallback = vi.fn((callback) => { scheduled = callback; return 1; });
+  video.cancelVideoFrameCallback = vi.fn();
+  let finish!: (frame: LandmarkFrame) => void;
+  const detector: LandmarkDetector = {
+    initialize: vi.fn(async () => undefined), close: vi.fn(), isReady: () => true,
+    detect: vi.fn(() => new Promise<LandmarkFrame>((resolve) => { finish = resolve; })),
+    diagnostics: () => ({ mode: "worker", delegate: "GPU", workerMs: 10, framePreparationMs: 2 }),
+  };
+  const factory = () => detector;
+  const wrapper = ({ children }: { children: ReactNode }) => <SignRecognitionContext.Provider value={factory}>{children}</SignRecognitionContext.Provider>;
+  const onFrame = vi.fn();
+  const metrics = new RecognitionPerformance();
+  const extractFeatures = () => new Float32Array(138);
+  const { result, unmount } = renderHook(() => useLandmarkDetection({ video, enabled: true, metrics, extractFeatures, onFrame }), { wrapper });
+  await waitFor(() => expect(result.current.status).toBe("ready"));
+  const tick = (now: number) => act(() => { video.currentTime = now / 1_000; scheduled(now, {} as VideoFrameCallbackMetadata); });
+  tick(0); tick(70); tick(140);
+  expect(detector.detect).toHaveBeenCalledOnce();
+  expect(metrics.snapshot().counters.landmarkBusy).toBe(2);
+  await act(async () => { finish({ timestampMs: 1, pose: null, leftHand: null, rightHand: null }); });
+  expect(onFrame).toHaveBeenCalledOnce();
+  expect(metrics.snapshot().landmarkRuntime).toMatchObject({ mode: "worker", delegate: "GPU" });
+  expect(metrics.snapshot().timings.landmarkWorkerMs?.p50).toBe(10);
+  tick(210);
+  Object.defineProperty(document, "hidden", { configurable: true, value: true });
+  await act(async () => { finish({ timestampMs: 2, pose: null, leftHand: null, rightHand: null }); });
+  expect(onFrame).toHaveBeenCalledOnce();
+  expect(metrics.snapshot().counters.landmarkStale).toBe(1);
+  Object.defineProperty(document, "hidden", { configurable: true, value: false });
+  tick(280);
+  unmount();
+  await act(async () => { finish({ timestampMs: 3, pose: null, leftHand: null, rightHand: null }); });
+  expect(onFrame).toHaveBeenCalledOnce();
+  expect(metrics.snapshot().counters.frames).toBe(1);
 });

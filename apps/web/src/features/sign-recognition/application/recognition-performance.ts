@@ -1,17 +1,24 @@
+import type { LandmarkDetectorDiagnostics } from "./ports/landmark-detector";
+
 export type RecognitionTiming =
   | "modelLoadMs" | "modelDownloadMs" | "modelIntegrityMs" | "modelSessionMs"
-  | "landmarkLoadMs" | "landmarkMs" | "featuresMs"
+  | "landmarkLoadMs" | "landmarkMs" | "landmarkWorkerMs" | "framePreparationMs" | "featuresMs"
   | "frameIntervalMs" | "observationMs" | "queueMs" | "inferenceMs"
   | "segmentToPredictionMs";
 
 export type RecognitionCounter =
   | "frames" | "accepted" | "uncertain" | "duplicates" | "missingHands"
-  | "overloaded" | "stale" | "inferenceErrors" | "frameGaps";
+  | "overloaded" | "stale" | "inferenceErrors" | "frameGaps" | "landmarkBusy" | "landmarkStale";
 
 /** Bounded, session-local measurements. Never stores frames, labels or conversation text. */
 export class RecognitionPerformance {
   private timings = new Map<RecognitionTiming, { total: number; values: number[] }>();
   private counters: Partial<Record<RecognitionCounter, number>> = {};
+  private landmarkRuntime: Pick<LandmarkDetectorDiagnostics, "mode" | "delegate" | "fallback"> | null = null;
+
+  setLandmarkRuntime({ mode, delegate, fallback }: LandmarkDetectorDiagnostics): void {
+    this.landmarkRuntime = { mode, delegate, fallback };
+  }
 
   record(name: RecognitionTiming, milliseconds: number): void {
     if (!Number.isFinite(milliseconds) || milliseconds < 0) return;
@@ -29,6 +36,7 @@ export class RecognitionPerformance {
   reset(): void {
     this.timings.clear();
     this.counters = {};
+    this.landmarkRuntime = null;
   }
 
   snapshot() {
@@ -45,8 +53,9 @@ export class RecognitionPerformance {
     })) as Partial<Record<RecognitionTiming, { total: number; samples: number; mean: number; p50: number; p95: number }>>;
     const interval = timings.frameIntervalMs?.mean;
     return {
-      schemaVersion: 1,
+      schemaVersion: 2,
       pipelineVersion: "continuous-v2",
+      landmarkRuntime: this.landmarkRuntime ? { ...this.landmarkRuntime } : null,
       sampleLimit: 120,
       processedFps: interval ? 1_000 / interval : null,
       timings,

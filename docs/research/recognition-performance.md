@@ -31,9 +31,12 @@ No introduce traducción de frases, recorte de secuencias ni modelos LSA como LS
 - Las propuestas siguen siendo texto editable; este pipeline no confirma ni
   guarda mensajes automáticamente.
 
-MediaPipe sigue siendo síncrono en el hilo principal. Moverlo a un Worker,
-reutilizar recursos entre rutas y alojar Holistic con versión/hash fijos son
-trabajos posteriores: deben medirse con el diagnóstico antes de priorizarlos.
+El baseline conserva MediaPipe síncrono en el hilo principal. Existe un
+[Worker optativo con fallback al iniciar](landmark-worker.md), con una sola
+imagen en tránsito, descarte de resultados de más de 1 s o de una pestaña oculta
+y liberación de recursos al detener. No cambia las 30 observaciones ni las 138
+características. Reutilizar detectores entre rutas y alojar Holistic con versión
+y hash fijos siguen pendientes.
 
 ## Diagnóstico local
 
@@ -43,6 +46,8 @@ analítica. Cada etapa conserva como máximo 120 valores en memoria y exporta
 agregados: total observado, número de muestras retenidas, media, p50 y p95.
 Los percentiles usan el método de rango más próximo sobre las muestras retenidas.
 El informe incluye ID, versión, hash del modelo, esquema de características y dimensiones de entrada para identificar el contrato medido. No se incluyen imágenes, landmarks, tensores, etiquetas, mensajes ni IDs de atención. Al cambiar de modelo se reinicia la medición y se descartan resultados tardíos del anterior.
+El esquema JSON v2 añade `landmarkRuntime`: modo realmente utilizado, delegado
+GPU/CPU y motivo de fallback, sin rutas ni detalles de excepciones.
 La memoria se libera al desmontar el panel; reiniciar la medición limpia contadores.
 
 | Medición | Qué representa |
@@ -52,7 +57,9 @@ La memoria se libera al desmontar el panel; reiniciar la medición limpia contad
 | modelIntegrityMs | Verificación SHA-256 |
 | modelSessionMs | Creación de sesión ONNX y validación de entrada |
 | landmarkLoadMs | Inicialización del detector MediaPipe |
-| landmarkMs | Tiempo síncrono de extracción de landmarks por fotograma |
+| landmarkMs | Tiempo hasta recibir landmarks; en Worker incluye preparar/transferir la imagen, cómputo y entrega de respuesta |
+| landmarkWorkerMs | Cómputo de `detectForVideo` dentro del Worker; no incluye la transferencia |
+| framePreparationMs | Preparación de ImageBitmap antes de transferirlo |
 | featuresMs | Extracción de las 138 características |
 | frameIntervalMs / processedFps | Intervalo y FPS reales de fotogramas procesados; excluye pausas ≥1 s |
 | observationMs | Tiempo de la ventana de 30 observaciones |
@@ -66,6 +73,10 @@ que después pueden rechazarse por incertidumbre. `accepted` cuenta propuestas
 que pasan el umbral y la supresión de duplicados, no confirmaciones humanas.
 Los contadores también distinguen incertidumbre, duplicados, manos ausentes,
 saturación, atraso, interrupciones de fotogramas y fallos de inferencia.
+`landmarkBusy` cuenta oportunidades omitidas mientras una detección asíncrona
+sigue en curso, sin guardar imágenes pendientes. `landmarkStale` cuenta resultados
+descartados por atraso o pestaña oculta. Estos descartes deben incluirse en la
+comparación: no basta con informar solo los fotogramas rápidos.
 
 ## Protocolo de comparación
 

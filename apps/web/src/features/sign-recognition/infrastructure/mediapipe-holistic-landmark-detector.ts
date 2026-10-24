@@ -10,8 +10,8 @@ import type { LandmarkFrame, LandmarkPoint } from "../domain/landmarks";
 
 const configuredWasmPath = process.env.NEXT_PUBLIC_MEDIAPIPE_WASM_PATH?.trim();
 const configuredModelUrl = process.env.NEXT_PUBLIC_MEDIAPIPE_HOLISTIC_MODEL_URL?.trim();
-const DEFAULT_WASM_PATH = configuredWasmPath || "/mediapipe/wasm";
-const DEFAULT_MODEL_URL = configuredModelUrl
+export const DEFAULT_WASM_PATH = configuredWasmPath || "/mediapipe/wasm";
+export const DEFAULT_MODEL_URL = configuredModelUrl
   || "https://storage.googleapis.com/mediapipe-models/holistic_landmarker/holistic_landmarker/float16/latest/holistic_landmarker.task";
 
 export interface HolisticResultLike {
@@ -65,6 +65,7 @@ export class MediaPipeHolisticLandmarkDetector implements LandmarkDetector {
   private readonly wasmPath: string;
   private readonly modelUrl: string;
   private readonly preferredDelegate: "GPU" | "CPU";
+  private activeDelegate: "GPU" | "CPU" | undefined;
 
   constructor(options: MediaPipeHolisticOptions = {}) {
     this.wasmPath = options.wasmPath ?? DEFAULT_WASM_PATH;
@@ -97,9 +98,11 @@ export class MediaPipeHolisticLandmarkDetector implements LandmarkDetector {
       let landmarker: HolisticLandmarker;
       try {
         landmarker = await this.create(vision, this.preferredDelegate);
+        this.activeDelegate = this.preferredDelegate;
       } catch (error) {
         if (this.preferredDelegate === "CPU") throw error;
         landmarker = await this.create(vision, "CPU");
+        this.activeDelegate = "CPU";
       }
 
       if (this.closed) {
@@ -149,4 +152,6 @@ export class MediaPipeHolisticLandmarkDetector implements LandmarkDetector {
     this.landmarker?.close();
     this.landmarker = null;
   };
+
+  diagnostics = () => ({ mode: "main-thread" as const, delegate: this.activeDelegate });
 }

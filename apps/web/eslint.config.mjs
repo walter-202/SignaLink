@@ -11,6 +11,7 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     "public/mediapipe/wasm/**",
+    "public/mediapipe/1.1.1/**",
     "public/onnxruntime/wasm/**",
   ]),
 ]);

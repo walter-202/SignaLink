@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { createBrowserRecognitionRuntime } from "../infrastructure/browser-recognition-runtime";
 import type { RecognitionRuntime } from "../application/ports/recognition-runtime";
-import { MediaPipeHolisticLandmarkDetector } from "../infrastructure/mediapipe-holistic-landmark-detector";
+import { BrowserLandmarkDetector } from "../infrastructure/browser-landmark-detector";
 import {
   SignRecognitionContext,
   RecognitionModelContext,
@@ -33,7 +33,7 @@ export function SignRecognitionProvider({
   }, [runtime]);
   const selection = useMemo(() => ({ model, models, selectModel }), [model, models, selectModel]);
   const defaultFactory = useCallback(
-    () => new MediaPipeHolisticLandmarkDetector(),
+    () => new BrowserLandmarkDetector(),
     [],
   );
   const factory = useMemo(

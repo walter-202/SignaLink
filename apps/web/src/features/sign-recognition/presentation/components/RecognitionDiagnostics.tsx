@@ -11,7 +11,9 @@ const labels: Partial<Record<RecognitionTiming, string>> = {
   modelIntegrityMs: "Verificación SHA-256",
   modelSessionMs: "Inicialización ONNX",
   landmarkLoadMs: "Carga de landmarks",
-  landmarkMs: "Detección por fotograma",
+  landmarkMs: "Landmarks hasta recibir resultado",
+  landmarkWorkerMs: "Cómputo dentro del Worker",
+  framePreparationMs: "Preparación de imagen para Worker",
   featuresMs: "Extracción de características",
   observationMs: "Ventana observada",
   queueMs: "Espera de clasificación",
@@ -39,6 +41,11 @@ export function RecognitionDiagnostics({ metrics, model }: { metrics: Recognitio
   return (
     <section className="camera-settings-block" aria-label="Diagnóstico local de reconocimiento">
       <strong>Rendimiento de esta sesión</strong>
+      {snapshot.landmarkRuntime && <p className="help-text">
+        Landmarks: {snapshot.landmarkRuntime.mode === "worker" ? "Worker" : "hilo de la interfaz"}
+        {snapshot.landmarkRuntime.delegate ? ` · ${snapshot.landmarkRuntime.delegate}` : ""}.
+        {snapshot.landmarkRuntime.fallback ? " Se utilizó el modo compatible al iniciar." : ""}
+      </p>}
       <p className="help-text">
         {snapshot.processedFps === null ? "Sin fotogramas medidos." : `${snapshot.processedFps.toFixed(1)} FPS procesados.`}
         {" "}Últimas 120 muestras por etapa. El tiempo de segmento es aproximado y no mide la duración lingüística de una seña ni la confirmación humana.
@@ -50,6 +57,7 @@ export function RecognitionDiagnostics({ metrics, model }: { metrics: Recognitio
         })}
       </dl>
       <p className="help-text">Valores: mediana / percentil 95. Propuestas sobre el umbral: {snapshot.counters.accepted ?? 0}; inciertas: {snapshot.counters.uncertain ?? 0}; descartes por saturación o atraso: {(snapshot.counters.overloaded ?? 0) + (snapshot.counters.stale ?? 0)}.</p>
+      <p className="help-text">Fotogramas omitidos mientras el detector estaba ocupado: {snapshot.counters.landmarkBusy ?? 0}; resultados de landmarks atrasados u ocultos: {snapshot.counters.landmarkStale ?? 0}. No se acumula video en una cola.</p>
       <div className="composer-tools">
         <Button variant="secondary" size="small" onClick={() => setSnapshot(metrics.snapshot())}>Actualizar medición</Button>
         <Button variant="secondary" size="small" onClick={download}>Exportar diagnóstico</Button>

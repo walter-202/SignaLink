@@ -11,6 +11,9 @@ const modules = [
   "application/recognition-performance",
   "infrastructure/onnx-lsb-classifier",
   "infrastructure/onnx-sequence-classifier",
+  "application/ports/landmark-detector",
+  "infrastructure/mediapipe-holistic-landmark-detector",
+  "infrastructure/worker-landmark-detector",
   "domain/landmarks",
   "domain/model-catalog",
 ];
@@ -30,9 +33,77 @@ test.beforeEach(async ({ page }) => {
     const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
     await route.fulfill({
       contentType: "text/javascript",
-      body: compiled.replace('import("onnxruntime-web/wasm")', 'import("/__recognition-test/ort.mjs")'),
+      body: compiled.replace('import("onnxruntime-web/wasm")', 'import("/__recognition-test/ort.mjs")')
+        .replace(/process\.env\.NEXT_PUBLIC_[A-Z_]+/g, "undefined"),
     });
   });
+});
+
+test("classic landmark Worker transfers an image and keeps the page responsive during synthetic compute", async ({ page, context }) => {
+  // The worker entry and adapter are production code. Only the Vision engine is
+  // synthetic: this verifies transport/lifecycle, not MediaPipe speed or accuracy.
+  await context.route("**/mediapipe/1.1.1/vision_bundle.js", (route) => route.fulfill({
+    contentType: "text/javascript",
+    body: `self.Vision = {
+      FilesetResolver: { forVisionTasks: async () => ({}) },
+      HolisticLandmarker: { createFromOptions: async () => ({ detectForVideo(bitmap) {
+        if (bitmap.width !== 320 || bitmap.height !== 240) throw new Error('Image not transferred');
+        const end = performance.now() + 250; while (performance.now() < end) {}
+        return { poseLandmarks: [[{ x: 0.5, y: 0.2, z: 0, visibility: 1 }]], leftHandLandmarks: [], rightHandLandmarks: [] };
+      } }) }
+    };`,
+  }));
+  await page.goto("/login");
+  const result = await page.evaluate(async () => {
+    const url = "/__recognition-test/infrastructure/worker-landmark-detector";
+    const { WorkerLandmarkDetector } = await import(url) as typeof import("../../src/features/sign-recognition/infrastructure/worker-landmark-detector");
+    const detector = new WorkerLandmarkDetector();
+    const canvas = document.createElement("canvas"); canvas.width = 320; canvas.height = 240;
+    canvas.getContext("2d")!.fillRect(0, 0, 320, 240);
+    const stream = canvas.captureStream(30);
+    const video = document.createElement("video"); video.muted = true; video.srcObject = stream;
+    let ticks = 0;
+    let timer: ReturnType<typeof setInterval> | undefined;
+    try {
+      await video.play();
+      await detector.initialize();
+      timer = setInterval(() => ticks++, 10);
+      const frame = await detector.detect(video, 123);
+      return { frame, ticks, diagnostics: detector.diagnostics() };
+    } finally {
+      clearInterval(timer); detector.close(); stream.getTracks().forEach((track) => track.stop());
+    }
+  });
+  expect(result.frame).toEqual({ timestampMs: 123, pose: [{ x: 0.5, y: 0.2, z: 0, visibility: 1 }], leftHand: null, rightHand: null });
+  expect(result.ticks).toBeGreaterThan(2);
+  expect(result.diagnostics.mode).toBe("worker");
+  expect(result.diagnostics.workerMs).toBeGreaterThanOrEqual(240);
+});
+
+test("real local MediaPipe bundle and WASM bootstrap in the classic Worker and report an invalid task", async ({ page, context, isMobile }) => {
+  test.skip(isMobile, "A second emulated viewport is not another MediaPipe device benchmark.");
+  test.setTimeout(90_000);
+  let taskRequests = 0;
+  let wasmRequests = 0;
+  context.on("request", (request) => { if (request.url().includes("/mediapipe/wasm/") && request.url().endsWith(".wasm")) wasmRequests++; });
+  await context.route("**/__invalid-holistic.task", (route) => {
+    taskRequests++;
+    return route.fulfill({ status: 404, body: "Task intentionally unavailable in bootstrap smoke test" });
+  });
+  await page.goto("/login");
+  const result = await page.evaluate(async () => {
+    const worker = new Worker("/mediapipe/1.1.1/holistic-worker.js");
+    try {
+      return await new Promise<{ type: string; code?: string }>((resolve, reject) => {
+        worker.onmessage = ({ data }) => resolve(data);
+        worker.onerror = () => reject(new Error("Worker bootstrap failed"));
+        worker.postMessage({ type: "initialize", wasmPath: new URL("/mediapipe/wasm", location.href).href, modelUrl: new URL("/__invalid-holistic.task", location.href).href });
+      });
+    } finally { worker.terminate(); }
+  });
+  expect(result).toEqual({ type: "error", code: "model-load" });
+  expect(wasmRequests).toBeGreaterThan(0);
+  expect(taskRequests).toBeGreaterThan(0);
 });
 
 test("browser pipeline captures during slow synthetic inference and cancels late results", async ({ page }) => {

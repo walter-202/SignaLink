@@ -84,6 +84,7 @@ export function useLandmarkDetection({
     let previousFrameAt: number | null = null;
     let lastTimestampMs = 0;
     let lastVideoTime = -1;
+    let detecting = false;
     const sourceVideo = video;
     const useVideoFrames = typeof sourceVideo.requestVideoFrameCallback === "function"
       && typeof sourceVideo.cancelVideoFrameCallback === "function";
@@ -120,20 +121,47 @@ export function useLandmarkDetection({
       if (now - lastDetectionAt < frameIntervalMs) return;
       if (sourceVideo.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
       if (sourceVideo.videoWidth === 0 || sourceVideo.currentTime === lastVideoTime) return;
+      if (detecting) {
+        metrics?.increment("landmarkBusy");
+        return;
+      }
 
       lastDetectionAt = now;
       lastVideoTime = sourceVideo.currentTime;
       const timestampMs = Math.max(lastTimestampMs + 1, Math.round(performance.now()));
       lastTimestampMs = timestampMs;
 
-      try {
-        const detectionStartedAt = performance.now();
-        const frame = detector.detect(sourceVideo, timestampMs);
+      const detectionStartedAt = performance.now();
+      detecting = true;
+
+      function fail(cause: unknown) {
+        detecting = false;
         if (cancelled) return;
+        stopped = true;
+        cancelScheduledFrame();
+        detector.close();
+        const code = cause instanceof LandmarkDetectorError ? cause.code : "inference";
+        setStatus("error");
+        setError(getLandmarkErrorMessage(code));
+      }
+
+      function complete(frame: LandmarkFrame) {
+        detecting = false;
+        if (cancelled || stopped) return;
         const detectedAt = performance.now();
+        if (document.hidden || detectedAt - detectionStartedAt > 1_000) {
+          metrics?.increment("landmarkStale");
+          return;
+        }
         const nextFeatures = extractFeatures(frame);
         metrics?.record("landmarkMs", detectedAt - detectionStartedAt);
         metrics?.record("featuresMs", performance.now() - detectedAt);
+        const info = detector.diagnostics?.();
+        if (info) {
+          metrics?.setLandmarkRuntime(info);
+          if (info.workerMs !== undefined) metrics?.record("landmarkWorkerMs", info.workerMs);
+          if (info.framePreparationMs !== undefined) metrics?.record("framePreparationMs", info.framePreparationMs);
+        }
         metrics?.increment("frames");
         if (previousFrameAt !== null && detectionStartedAt - previousFrameAt < 1_000) {
           metrics?.record("frameIntervalMs", detectionStartedAt - previousFrameAt);
@@ -146,13 +174,14 @@ export function useLandmarkDetection({
           setLandmarks(frame);
           setFeatures(nextFeatures);
         }
+      }
+
+      try {
+        const result = detector.detect(sourceVideo, timestampMs);
+        if (result instanceof Promise) void result.then(complete).catch(fail);
+        else complete(result);
       } catch (cause) {
-        if (cancelled) return;
-        stopped = true;
-        cancelScheduledFrame();
-        const code = cause instanceof LandmarkDetectorError ? cause.code : "inference";
-        setStatus("error");
-        setError(getLandmarkErrorMessage(code));
+        fail(cause);
       }
     }
 
@@ -161,6 +190,8 @@ export function useLandmarkDetection({
       .then(() => {
         if (cancelled) return;
         metrics?.record("landmarkLoadMs", performance.now() - loadingStartedAt);
+        const info = detector.diagnostics?.();
+        if (info) metrics?.setLandmarkRuntime(info);
         setStatus("ready");
         schedule();
       })

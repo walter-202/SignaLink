@@ -19,7 +19,16 @@ export class LandmarkDetectorError extends Error {
 /** Port for on-device landmark extraction. */
 export interface LandmarkDetector {
   initialize: () => Promise<void>;
-  detect: (video: HTMLVideoElement, timestampMs: number) => LandmarkFrame;
+  detect: (video: HTMLVideoElement, timestampMs: number) => LandmarkFrame | Promise<LandmarkFrame>;
   close: () => void;
   isReady: () => boolean;
+  diagnostics?: () => LandmarkDetectorDiagnostics;
+}
+
+export interface LandmarkDetectorDiagnostics {
+  mode: "main-thread" | "worker";
+  delegate?: "GPU" | "CPU";
+  fallback?: "unsupported" | "worker-initialization";
+  workerMs?: number;
+  framePreparationMs?: number;
 }

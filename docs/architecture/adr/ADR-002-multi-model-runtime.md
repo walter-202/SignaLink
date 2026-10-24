@@ -59,5 +59,8 @@ LSA en compatibles con LSB. La validación de dimensiones dinámicas se completa
 al ejecutar la primera inferencia y comprobar la forma real de salida.
 
 Esta decisión no reduce por sí sola la latencia un 50%. Prepara comparaciones de
-modelos sin acoplar la atención a su arquitectura. El Worker de MediaPipe, la caché
-verificable de Holistic y la evaluación representativa siguen el [roadmap](../../roadmap/recognition-mvp.md).
+modelos sin acoplar la atención a su arquitectura. El
+[prototipo optativo de Worker](../../research/landmark-worker.md) implementa el
+puerto de landmarks asíncrono con fallback al iniciar y una imagen en tránsito.
+La caché verificable de Holistic y la evaluación representativa siguen el
+[roadmap](../../roadmap/recognition-mvp.md).
