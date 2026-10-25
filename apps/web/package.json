@@ -5,6 +5,7 @@
   "scripts": {
     "copy:mediapipe-wasm": "node scripts/copy-mediapipe-wasm.mjs",
     "prepare:holistic": "node scripts/prepare-holistic-model.mjs",
+    "compare:recognition": "node scripts/compare-recognition-diagnostics.mjs",
     "copy:onnxruntime-wasm": "node scripts/copy-onnxruntime-wasm.mjs",
     "dev": "pnpm copy:mediapipe-wasm && pnpm copy:onnxruntime-wasm && next dev --webpack",
     "dev:turbo": "pnpm copy:mediapipe-wasm && pnpm copy:onnxruntime-wasm && next dev",

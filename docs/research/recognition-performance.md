@@ -47,9 +47,11 @@ analítica. Cada etapa conserva como máximo 120 valores en memoria y exporta
 agregados: total observado, número de muestras retenidas, media, p50 y p95.
 Los percentiles usan el método de rango más próximo sobre las muestras retenidas.
 El informe incluye ID, versión, hash del modelo, esquema de características y dimensiones de entrada para identificar el contrato medido. No se incluyen imágenes, landmarks, tensores, etiquetas, mensajes ni IDs de atención. Al cambiar de modelo se reinicia la medición y se descartan resultados tardíos del anterior.
-El esquema JSON v3 incluye `landmarkRuntime`: modo realmente utilizado, delegado
-GPU/CPU, motivo de fallback y metadatos de integridad/lectura de los pesos, sin
-rutas ni detalles de excepciones.
+El esquema JSON v4 incluye `landmarkRuntime`, soporte de medición de fluidez,
+intervalo solicitado y umbrales del clasificador. Conserva modo realmente usado,
+delegado GPU/CPU, fallback y metadatos de integridad/lectura de los pesos, sin rutas
+ni detalles de excepciones. La [comparación local](recognition-comparison.md)
+valida estos contratos sin aprobar automáticamente la meta del 50%.
 La memoria se libera al desmontar el panel; reiniciar la medición limpia contadores.
 
 | Medición | Qué representa |
@@ -64,6 +66,7 @@ La memoria se libera al desmontar el panel; reiniciar la medición limpia contad
 | landmarkMs | Tiempo hasta recibir landmarks; en Worker incluye preparar/transferir la imagen, cómputo y entrega de respuesta |
 | landmarkWorkerMs | Cómputo de `detectForVideo` dentro del Worker; no incluye la transferencia |
 | framePreparationMs | Preparación de ImageBitmap antes de transferirlo |
+| uiDelayMs / uiLongTaskMs | Retraso del hilo de interfaz y duración de tareas largas; se miden por separado del reconocimiento |
 | featuresMs | Extracción de las 138 características |
 | frameIntervalMs / processedFps | Intervalo y FPS reales de fotogramas procesados; excluye pausas ≥1 s |
 | observationMs | Tiempo de la ventana de 30 observaciones |

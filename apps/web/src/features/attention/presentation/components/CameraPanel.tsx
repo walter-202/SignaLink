@@ -23,7 +23,8 @@ import {
   useLandmarkDetection,
 } from "@/features/sign-recognition";
 import { formatMiB } from "@/features/sign-recognition/domain/model-catalog";
-import { useRecognitionModel } from "@/features/sign-recognition/presentation/SignRecognitionContext";
+import { useRecognitionModel, useLandmarkRuntime, type LandmarkRuntimeMode } from "@/features/sign-recognition/presentation/SignRecognitionContext";
+import { BrowserResponsivenessMonitor } from "@/features/sign-recognition/infrastructure/browser-responsiveness-monitor";
 import { ContinuousRecognitionPipeline } from "@/features/sign-recognition/application/continuous-recognition-pipeline";
 import { RecognitionPerformance } from "@/features/sign-recognition/application/recognition-performance";
 import { RecognitionDiagnostics } from "@/features/sign-recognition/presentation/components/RecognitionDiagnostics";
@@ -39,6 +40,7 @@ interface CameraPanelProps {
 
 export function CameraPanel({ camera }: CameraPanelProps) {
   const { model, models, selectModel } = useRecognitionModel();
+  const landmarkRuntime = useLandmarkRuntime();
   const { manifest } = model;
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [modelLoadStatus, setModelLoadStatus] = useState<ModelLoadStatus>("loading");
@@ -57,6 +59,7 @@ export function CameraPanel({ camera }: CameraPanelProps) {
   const lastProgressRef = useRef(0);
   const previousContinuousRef = useRef(false);
   const preserveCaptureErrorRef = useRef(false);
+  const measuredLandmarkModeRef = useRef(landmarkRuntime.mode);
   const previousStatusRef = useRef<CameraStatus>("idle");
   const captureStatus = useAttentionStore((state) => state.captureStatus);
   const captureProgress = useAttentionStore((state) => state.captureProgress);
@@ -89,6 +92,34 @@ export function CameraPanel({ camera }: CameraPanelProps) {
     && landmarkDetection.status === "ready"
     && currentModelReady
     && captureStatus !== "reviewing";
+
+  useEffect(() => {
+    if (measuredLandmarkModeRef.current === landmarkRuntime.mode) return;
+    measuredLandmarkModeRef.current = landmarkRuntime.mode;
+    // Stop the segmenter before any frame from a different detector can arrive.
+    pipelineRef.current?.stop();
+    const state = useAttentionStore.getState();
+    if (state.continuousCapture || state.captureStatus === "capturing" || state.captureStatus === "processing") cancelCapture();
+    lastAcceptedRef.current = null;
+    lastProgressRef.current = 0;
+    metrics.reset();
+  }, [landmarkRuntime.mode, cancelCapture, metrics]);
+
+  useEffect(() => {
+    if (!camera.isActive || !landmarksEnabled) return;
+    const monitor = new BrowserResponsivenessMonitor(metrics);
+    monitor.start();
+    return () => monitor.stop();
+  }, [camera.isActive, landmarksEnabled, landmarkRuntime.mode, metrics]);
+
+  function changeLandmarkMode(mode: LandmarkRuntimeMode) {
+    const state = useAttentionStore.getState();
+    if (state.continuousCapture || state.captureStatus === "capturing" || state.captureStatus === "reviewing" || state.captureStatus === "processing") return;
+    if (mode === landmarkRuntime.mode) return;
+    pipelineRef.current?.stop();
+    metrics.reset();
+    landmarkRuntime.selectMode(mode);
+  }
   const setVideoRef = useCallback((node: HTMLVideoElement | null) => {
     videoRef.current = node;
     setVideoElement(node);
@@ -547,7 +578,17 @@ export function CameraPanel({ camera }: CameraPanelProps) {
             <p className="help-text">{manifest.task}. Intervalo solicitado: {manifest.frameIntervalMs} ms; los FPS reales dependen del equipo. Estado: {manifest.validationStatus === "experimental" ? "experimental, sin validación lingüística" : "validado según su ficha"}. <a href={manifest.sourceUrl} target="_blank" rel="noreferrer">Origen y licencia: {manifest.license}</a>.</p>
           </div>
         </div>
-        {currentModelReady ? <RecognitionDiagnostics key={`${manifest.id}@${manifest.version}`} metrics={metrics} model={manifest} /> : null}
+        <section className="camera-settings-block">
+          <label className="field-label" htmlFor="landmark-runtime">Motor de landmarks</label>
+          <select id="landmark-runtime" className="native-select" aria-describedby="landmark-runtime-help" value={landmarkRuntime.mode}
+            disabled={!landmarkRuntime.selectable || continuousCapture || captureStatus === "capturing" || captureStatus === "reviewing" || captureStatus === "processing"}
+            onChange={(event) => changeLandmarkMode(event.currentTarget.value as LandmarkRuntimeMode)}>
+            <option value="main-thread">Compatible · hilo de la interfaz</option>
+            <option value="worker">Worker · experimental</option>
+          </select>
+          <p id="landmark-runtime-help" className="help-text">Cambia fuera de captura o revisión. Reinicia la medición y conserva el modelo LSB. El diagnóstico muestra el motor real si se usa fallback.</p>
+        </section>
+        {currentModelReady ? <RecognitionDiagnostics key={`${manifest.id}@${manifest.version}:${landmarkRuntime.mode}`} metrics={metrics} model={manifest} /> : null}
         <label className="setting-row">
           <span><strong>Detectar landmarks en el navegador</strong><small>MediaPipe procesa la pose y las manos localmente; el video no se envía.</small></span>
           <input

@@ -4,17 +4,26 @@ export type RecognitionTiming =
   | "modelLoadMs" | "modelDownloadMs" | "modelIntegrityMs" | "modelSessionMs"
   | "landmarkLoadMs" | "landmarkMs" | "landmarkWorkerMs" | "framePreparationMs" | "featuresMs"
   | "landmarkAssetReadMs" | "landmarkAssetIntegrityMs"
+  | "uiDelayMs" | "uiLongTaskMs"
   | "frameIntervalMs" | "observationMs" | "queueMs" | "inferenceMs"
   | "segmentToPredictionMs";
 
 export type RecognitionCounter =
   | "frames" | "accepted" | "uncertain" | "duplicates" | "missingHands"
-  | "overloaded" | "stale" | "inferenceErrors" | "frameGaps" | "landmarkBusy" | "landmarkStale";
+  | "overloaded" | "stale" | "inferenceErrors" | "frameGaps" | "landmarkBusy" | "landmarkStale"
+  | "uiLongTasks" | "uiMeasurementGaps";
 
 /** Bounded, session-local measurements. Never stores frames, labels or conversation text. */
 export class RecognitionPerformance {
+  private measurementEpoch = 0;
+  get epoch(): number { return this.measurementEpoch; }
   private timings = new Map<RecognitionTiming, { total: number; values: number[] }>();
   private counters: Partial<Record<RecognitionCounter, number>> = {};
+  private responsiveness: { longTasksSupported: boolean } | null = null;
+
+  setResponsivenessSupport(longTasksSupported: boolean): void {
+    this.responsiveness = { longTasksSupported };
+  }
   private landmarkRuntime: Pick<LandmarkDetectorDiagnostics, "mode" | "delegate" | "fallback" | "asset"> | null = null;
 
   setLandmarkRuntime({ mode, delegate, fallback, asset }: LandmarkDetectorDiagnostics): void {
@@ -38,9 +47,11 @@ export class RecognitionPerformance {
   }
 
   reset(): void {
+    this.measurementEpoch++;
     this.timings.clear();
     this.counters = {};
     this.landmarkRuntime = null;
+    this.responsiveness = null;
   }
 
   snapshot() {
@@ -57,9 +68,10 @@ export class RecognitionPerformance {
     })) as Partial<Record<RecognitionTiming, { total: number; samples: number; mean: number; p50: number; p95: number }>>;
     const interval = timings.frameIntervalMs?.mean;
     return {
-      schemaVersion: 3,
+      schemaVersion: 4,
       pipelineVersion: "continuous-v2",
       landmarkRuntime: this.landmarkRuntime ? { ...this.landmarkRuntime, asset: this.landmarkRuntime.asset ? { ...this.landmarkRuntime.asset } : undefined } : null,
+      responsiveness: this.responsiveness ? { ...this.responsiveness } : null,
       sampleLimit: 120,
       processedFps: interval ? 1_000 / interval : null,
       timings,

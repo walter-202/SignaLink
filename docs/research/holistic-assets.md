@@ -76,7 +76,7 @@ credenciales. No se añade un Service Worker ni un bypass de autenticación.
 
 En Ajustes de captura, el diagnóstico distingue `verified`/`unverified`, origen
 `fetch`/`cache-storage`, versión/hash y bytes. `fetch` puede incluir caché HTTP;
-no equivale necesariamente a una descarga de red. El JSON v3 añade
+no equivale necesariamente a una descarga de red. El JSON añade
 `landmarkAssetReadMs` y `landmarkAssetIntegrityMs`. `landmarkLoadMs` sigue midiendo
 la inicialización completa, incluida caché, transferencia y creación del motor.
 

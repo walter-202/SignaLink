@@ -16,6 +16,12 @@ El protocolo inicial está en [rendimiento](../research/recognition-performance.
 | 4. Corpus y evaluación | 12–20 intenciones administrativas con expresiones LSB validadas; material autorizado; participantes separados entre entrenamiento/evaluación; anotaciones temporales | Pendiente de colaboración lingüística y muestras autorizadas |
 | 5. Modelo ligero y piloto | Comparar TCN, GRU y Conv1D+GRU; exportar ONNX; cuantizar solo si mejora velocidad/calidad; piloto supervisado y respuestas visuales validadas | Depende de la etapa 4 |
 
+Ya se puede [comparar baseline/Worker desde Ajustes](../research/recognition-comparison.md)
+sin reiniciar Next y medir la fluidez separadamente. El comparador local comprueba
+contratos técnicos de los JSON v4; no sustituye el benchmark con corpus. Se incluye
+un protocolo preparatorio en `model-lab/configs/public-service-benchmark.yaml`,
+sin datos, artefactos reales ni un runner lingüístico instalados.
+
 La recopilación y validación lingüística pueden avanzar mientras se optimiza el
 runtime. No sustituir LSB por pesos LSA ni tratar frases como concatenaciones
 lingüísticas de etiquetas. SignBart y las referencias de LSCh son candidatos de

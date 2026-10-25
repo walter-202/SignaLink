@@ -2,19 +2,30 @@ import { LandmarkDetectorError, type LandmarkDetector, type LandmarkDetectorDiag
 import { MediaPipeHolisticLandmarkDetector } from "./mediapipe-holistic-landmark-detector";
 import { WorkerLandmarkDetector } from "./worker-landmark-detector";
 
+interface BrowserLandmarkOptions {
+  preferWorker: boolean;
+  workerSupported: () => boolean;
+  createWorker: () => LandmarkDetector;
+  createMain: () => LandmarkDetector;
+}
+
 /** Opt-in until representative browser/device comparisons justify promotion. */
 export class BrowserLandmarkDetector implements LandmarkDetector {
   private detector: LandmarkDetector | null = null;
   private closed = false;
   private initializing: Promise<void> | null = null;
   private fallback: LandmarkDetectorDiagnostics["fallback"];
+  private readonly options: BrowserLandmarkOptions;
 
-  constructor(private readonly options = {
-    preferWorker: process.env.NEXT_PUBLIC_MEDIAPIPE_WORKER === "on",
-    workerSupported: () => WorkerLandmarkDetector.supported(),
-    createWorker: (): LandmarkDetector => new WorkerLandmarkDetector(),
-    createMain: (): LandmarkDetector => new MediaPipeHolisticLandmarkDetector(),
-  }) {}
+  constructor(options: Partial<BrowserLandmarkOptions> = {}) {
+    this.options = {
+      preferWorker: process.env.NEXT_PUBLIC_MEDIAPIPE_WORKER === "on",
+      workerSupported: () => WorkerLandmarkDetector.supported(),
+      createWorker: () => new WorkerLandmarkDetector(),
+      createMain: () => new MediaPipeHolisticLandmarkDetector(),
+      ...options,
+    };
+  }
 
   isReady = () => !this.closed && (this.detector?.isReady() ?? false);
   diagnostics = (): LandmarkDetectorDiagnostics => ({ ...(this.detector?.diagnostics?.() ?? { mode: "main-thread" }), fallback: this.fallback });

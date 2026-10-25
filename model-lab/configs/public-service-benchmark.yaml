@@ -1,0 +1,47 @@
+# Protocolo preparatorio. No lo consume el comparador de JSON ni existe aún
+# un runner con corpus real. Los criterios deben acordarse antes de evaluar.
+protocol_version: 1
+status: awaiting_authorized_artifacts_and_corpus
+language: LSB
+baseline:
+  model_id: lsb-reference-v4
+  feature_schema: lsb-v4-138-v1
+  input_shape: [1, 30, 138]
+  frame_interval_ms: 33
+  detector: holistic
+candidate:
+  change_under_test: holistic_worker
+  preserve_classifier_and_preprocessor: true
+corpus:
+  manifest: null
+  permission_review: required
+  linguistic_validation: required
+  administrative_intents_target: [12, 20]
+  split_by_signer: true
+  include_rest_and_non_sign_movements: true
+  regional_variants: document_with_lsb_reviewers
+  sample_size: agree_before_evaluation
+artifacts:
+  holistic_version: null
+  holistic_sha256: null
+  holistic_bytes: null
+comparison:
+  same_device_browser_and_samples: required
+  alternate_baseline_and_candidate_order: true
+  separate_cold_warm_and_human_confirmation: true
+  exclude_warmup_from_hot_run_only: true
+  report_rejections_abstentions_and_missing_proposals: true
+  primary_latency: annotated_sign_onset_to_visible_editable_proposal
+  secondary: [landmark_ms, effective_fps, ui_delay_ms, memory, time_to_confirm]
+proposed_promotion_gates:
+  latency_p50_candidate_to_baseline_max: 0.5
+  latency_p95_candidate_to_baseline_max: 0.5
+  macro_f1_drop_percentage_points_max: 1
+  false_positives_per_minute_must_not_increase: true
+  signer_disjoint_evaluation: required
+  sample_size_and_uncertainty_report: required
+  human_and_linguistic_review: required
+privacy:
+  upload_camera_or_landmarks_by_default: false
+  raw_dataset_in_git: false
+  diagnostic_exports: aggregate_numeric_and_model_metadata_only

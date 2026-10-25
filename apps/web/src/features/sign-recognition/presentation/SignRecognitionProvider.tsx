@@ -7,6 +7,8 @@ import { BrowserLandmarkDetector } from "../infrastructure/browser-landmark-dete
 import {
   SignRecognitionContext,
   RecognitionModelContext,
+  LandmarkRuntimeContext,
+  type LandmarkRuntimeMode,
   type LandmarkDetectorFactory,
 } from "./SignRecognitionContext";
 
@@ -32,9 +34,18 @@ export function SignRecognitionProvider({
     setModelId(id);
   }, [runtime]);
   const selection = useMemo(() => ({ model, models, selectModel }), [model, models, selectModel]);
+  const [landmarkMode, setLandmarkMode] = useState<LandmarkRuntimeMode>(
+    () => process.env.NEXT_PUBLIC_MEDIAPIPE_WORKER === "on" ? "worker" : "main-thread",
+  );
+  const selectLandmarkMode = useCallback((mode: LandmarkRuntimeMode) => {
+    if (createDetector) throw new Error("El detector inyectado controla su propio motor.");
+    if (mode !== "main-thread" && mode !== "worker") throw new Error("Motor de landmarks desconocido.");
+    setLandmarkMode(mode);
+  }, [createDetector]);
+  const landmarkSelection = useMemo(() => ({ mode: landmarkMode, selectable: !createDetector, selectMode: selectLandmarkMode }), [landmarkMode, createDetector, selectLandmarkMode]);
   const defaultFactory = useCallback(
-    () => new BrowserLandmarkDetector(),
-    [],
+    () => new BrowserLandmarkDetector({ preferWorker: landmarkMode === "worker" }),
+    [landmarkMode],
   );
   const factory = useMemo(
     () => createDetector ?? defaultFactory,
@@ -43,9 +54,11 @@ export function SignRecognitionProvider({
 
   return (
     <RecognitionModelContext.Provider value={selection}>
-      <SignRecognitionContext.Provider value={factory}>
-        {children}
-      </SignRecognitionContext.Provider>
+      <LandmarkRuntimeContext.Provider value={landmarkSelection}>
+        <SignRecognitionContext.Provider value={factory}>
+          {children}
+        </SignRecognitionContext.Provider>
+      </LandmarkRuntimeContext.Provider>
     </RecognitionModelContext.Provider>
   );
 }

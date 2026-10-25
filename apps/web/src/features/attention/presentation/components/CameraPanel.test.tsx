@@ -300,6 +300,28 @@ describe("CameraPanel continuous recognition", () => {
     expect(useAttentionStore.getState().captureText).toBe("");
     await user.click(screen.getByRole("button", { name: "Ajustes de captura" }));
     expect(screen.getByLabelText("Modelo de reconocimiento")).toBeDisabled();
+    expect(screen.getByLabelText("Motor de landmarks")).toBeDisabled();
+  });
+
+  it("switches the landmark mode without reloading the classifier or losing a draft", async () => {
+    const user = userEvent.setup();
+    useAttentionStore.setState({ draft: "Requisitos del trámite" });
+    renderCamera();
+    await screen.findByText(/referencia v4 listo/);
+    await user.click(screen.getByRole("button", { name: "Ajustes de captura" }));
+    const selector = screen.getByLabelText("Motor de landmarks");
+    expect(selector).toHaveValue("main-thread");
+    await user.selectOptions(selector, "worker");
+    expect(selector).toHaveValue("worker");
+    expect(classifierMocks.initialize).toHaveBeenCalledOnce();
+    expect(classifierMocks.close).not.toHaveBeenCalled();
+    expect(useAttentionStore.getState().draft).toBe("Requisitos del trámite");
+    await user.selectOptions(selector, "main-thread");
+    expect(selector).toHaveValue("main-thread");
+    act(() => useAttentionStore.setState({ captureStatus: "capturing", continuousCapture: false }));
+    expect(selector).toBeDisabled();
+    await user.selectOptions(selector, "worker");
+    expect(selector).toHaveValue("main-thread");
   });
 
   it("does not append an inference that resolves after the operator stops capture", async () => {
@@ -329,5 +351,6 @@ describe("CameraPanel continuous recognition", () => {
     expect(screen.getByText(/Confirma o descarta la transcripción antes de iniciar otra captura/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Ajustes de captura" }));
     expect(screen.getByLabelText("Modelo de reconocimiento")).toBeDisabled();
+    expect(screen.getByLabelText("Motor de landmarks")).toBeDisabled();
   });
 });

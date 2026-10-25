@@ -2,7 +2,13 @@
 
 ## Qué está implementado
 
-El baseline sigue activo por defecto. Para probar el candidato, añadir a
+El baseline sigue activo por defecto. Para probar el candidato, elegir
+**Ajustes de captura → Motor de landmarks → Worker · experimental**. El cambio
+no requiere reiniciar Next; se bloquea durante captura/revisión.
+La [comparación local](recognition-comparison.md) explica cómo exportar ambos
+informes y distinguir fluidez de latencia de reconocimiento.
+
+Opcionalmente, para usar Worker como selección inicial, añadir a
 `apps/web/.env.local` (ignorado por Git) y reiniciar **el mismo servidor**:
 
 ```dotenv
@@ -46,8 +52,8 @@ con fotogramas duplicados ni se sustituye LSB por otra lengua.
 ## Cómo comparar
 
 1. Registrar navegador/equipo y el mismo conjunto autorizado de señas y reposo.
-2. Ejecutar baseline con la opción vacía y candidato con `on`. Reiniciar el
-   servidor existente entre configuraciones; no mantener dos servidores.
+2. Ejecutar baseline y candidato desde el selector de motor, sin mantener dos
+   servidores. Esperar la carga antes de medir ejecución caliente.
 3. Separar carga fría/caliente. Revisar en Ajustes de captura el modo real,
    delegado, `landmarkMs`, `landmarkWorkerMs`, `framePreparationMs`, FPS y descartes.
 4. Medir también respuesta a escritura/clics y latencia desde comienzo anotado de

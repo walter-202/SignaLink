@@ -15,6 +15,7 @@ const modules = [
   "infrastructure/mediapipe-holistic-landmark-detector",
   "infrastructure/worker-landmark-detector",
   "infrastructure/holistic-model-asset",
+  "infrastructure/browser-responsiveness-monitor",
   "domain/landmarks",
   "domain/model-catalog",
 ];
@@ -38,6 +39,31 @@ test.beforeEach(async ({ page }) => {
         .replace(/process\.env\.NEXT_PUBLIC_[A-Z_]+/g, "undefined"),
     });
   });
+});
+
+test("responsiveness monitoring detects a real main-thread stall without collecting task attribution", async ({ page }) => {
+  await page.goto("/login");
+  const result = await page.evaluate(async () => {
+    const metricsUrl = "/__recognition-test/application/recognition-performance";
+    const monitorUrl = "/__recognition-test/infrastructure/browser-responsiveness-monitor";
+    const { RecognitionPerformance } = await import(metricsUrl) as typeof import("../../src/features/sign-recognition/application/recognition-performance");
+    const { BrowserResponsivenessMonitor } = await import(monitorUrl) as typeof import("../../src/features/sign-recognition/infrastructure/browser-responsiveness-monitor");
+    const metrics = new RecognitionPerformance();
+    const monitor = new BrowserResponsivenessMonitor(metrics);
+    try {
+      monitor.start();
+      await new Promise((resolve) => setTimeout(resolve, 120));
+      const end = performance.now() + 180;
+      while (performance.now() < end) { /* Deliberate synthetic UI stall. */ }
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      return metrics.snapshot();
+    } finally { monitor.stop(); }
+  });
+  expect(result.responsiveness?.longTasksSupported).toBe(true);
+  expect(result.counters.uiLongTasks).toBeGreaterThan(0);
+  expect(result.timings.uiLongTaskMs?.p95).toBeGreaterThanOrEqual(150);
+  expect(result.timings.uiDelayMs?.p95).toBeGreaterThan(0);
+  expect(JSON.stringify(result)).not.toContain("attribution");
 });
 
 test("classic landmark Worker transfers an image and keeps the page responsive during synthetic compute", async ({ page, context }) => {

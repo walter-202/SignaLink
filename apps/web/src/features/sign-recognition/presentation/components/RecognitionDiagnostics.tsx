@@ -16,6 +16,8 @@ const labels: Partial<Record<RecognitionTiming, string>> = {
   landmarkMs: "Landmarks hasta recibir resultado",
   landmarkWorkerMs: "Cómputo dentro del Worker",
   framePreparationMs: "Preparación de imagen para Worker",
+  uiDelayMs: "Retraso del hilo de la interfaz",
+  uiLongTaskMs: "Duración de bloqueos de interfaz",
   featuresMs: "Extracción de características",
   observationMs: "Ventana observada",
   queueMs: "Espera de clasificación",
@@ -30,6 +32,8 @@ export function RecognitionDiagnostics({ metrics, model }: { metrics: Recognitio
     const report = {
       modelId: model.id, modelVersion: model.version, modelSha256: model.sha256,
       featureSchema: model.featureSchema, inputShape: model.inputShape,
+      frameIntervalMs: model.frameIntervalMs,
+      confidenceThreshold: model.confidenceThreshold, minimumMargin: model.minimumMargin,
       runtime: model.runtime, ...metrics.snapshot(),
     };
     const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: "application/json" }));
@@ -65,6 +69,10 @@ export function RecognitionDiagnostics({ metrics, model }: { metrics: Recognitio
       </dl>
       <p className="help-text">Valores: mediana / percentil 95. Propuestas sobre el umbral: {snapshot.counters.accepted ?? 0}; inciertas: {snapshot.counters.uncertain ?? 0}; descartes por saturación o atraso: {(snapshot.counters.overloaded ?? 0) + (snapshot.counters.stale ?? 0)}.</p>
       <p className="help-text">Fotogramas omitidos mientras el detector estaba ocupado: {snapshot.counters.landmarkBusy ?? 0}; resultados de landmarks atrasados u ocultos: {snapshot.counters.landmarkStale ?? 0}. No se acumula video en una cola.</p>
+      <p className="help-text">
+        {snapshot.responsiveness?.longTasksSupported ? `Tareas de interfaz de más de 50 ms: ${snapshot.counters.uiLongTasks ?? 0}.` : "Medición de tareas largas no disponible en este navegador o aún sin iniciar."}
+        {" "}La fluidez se mide por separado de la latencia de reconocimiento; pausas de medición: {snapshot.counters.uiMeasurementGaps ?? 0}.
+      </p>
       <div className="composer-tools">
         <Button variant="secondary" size="small" onClick={() => setSnapshot(metrics.snapshot())}>Actualizar medición</Button>
         <Button variant="secondary" size="small" onClick={download}>Exportar diagnóstico</Button>

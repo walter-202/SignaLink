@@ -13,12 +13,14 @@ function setup() {
 it("keeps the baseline when not opted in and uses main-thread mode if unsupported", async () => {
   const test = setup();
   test.options.preferWorker = false;
+  test.detector = new BrowserLandmarkDetector(test.options);
   await test.detector.initialize();
   expect(test.options.createWorker).not.toHaveBeenCalled();
   expect(test.detector.diagnostics()).toEqual({ mode: "main-thread", delegate: "GPU", fallback: undefined });
   test.detector.close();
   const unsupported = setup();
   unsupported.options.workerSupported = () => false;
+  unsupported.detector = new BrowserLandmarkDetector(unsupported.options);
   await unsupported.detector.initialize();
   expect(unsupported.detector.diagnostics().fallback).toBe("unsupported");
   expect(unsupported.options.createWorker).not.toHaveBeenCalled();
