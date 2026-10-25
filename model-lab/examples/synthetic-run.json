@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "synthetic-corpus",
+  "corpusSha256": "27ccf22c76ac43683c262882dbc272a0162205a1d8b9461ec12bad2a3d665266",
+  "split": "test",
+  "evidence": "synthetic",
+  "runId": "synthetic-run",
+  "model": {
+    "id": "synthetic-model",
+    "version": "fixture-v1",
+    "sha256": "fd52ec918228da2902f69b311d2f59f865befce889f786ea1e9481091fbcb1c7",
+    "trainingParticipantAudit": "unknown",
+    "labelIds": [
+      "label-a",
+      "label-b"
+    ]
+  },
+  "pipeline": {
+    "version": "synthetic-pipeline",
+    "codeRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "featureSchema": "synthetic-features",
+    "preprocessorId": "synthetic-preprocessor",
+    "inputShape": [
+      1,
+      30,
+      138
+    ],
+    "frameIntervalMs": 33,
+    "confidenceThreshold": 0.5,
+    "minimumMargin": 0,
+    "landmarkModelSha256": "86d44ca0f7d4708e4dd6d09d0f83e0f99d5e990a54488d64ffaf716559396d10",
+    "landmarkRuntime": "main-thread",
+    "delegate": "CPU",
+    "classifierRuntime": "onnx-wasm"
+  },
+  "deviceProfileId": "synthetic-device",
+  "browserProfileId": "synthetic-browser",
+  "condition": "warm",
+  "clock": "realtime-clip-start-ms",
+  "results": [
+    {
+      "clipId": "test-a1",
+      "status": "completed",
+      "observedUntilMs": 3000,
+      "proposals": [
+        {
+          "labelId": "label-a",
+          "visibleAtMs": 1500
+        }
+      ]
+    },
+    {
+      "clipId": "test-a2",
+      "status": "completed",
+      "observedUntilMs": 3000,
+      "proposals": [
+        {
+          "labelId": "label-a",
+          "visibleAtMs": 1500
+        }
+      ]
+    },
+    {
+      "clipId": "test-b1",
+      "status": "completed",
+      "observedUntilMs": 3000,
+      "proposals": [
+        {
+          "labelId": "label-b",
+          "visibleAtMs": 1500
+        }
+      ]
+    },
+    {
+      "clipId": "test-b2",
+      "status": "completed",
+      "observedUntilMs": 3000,
+      "proposals": [
+        {
+          "labelId": "label-b",
+          "visibleAtMs": 1500
+        }
+      ]
+    },
+    {
+      "clipId": "rest",
+      "status": "completed",
+      "observedUntilMs": 60000,
+      "proposals": []
+    },
+    {
+      "clipId": "movement",
+      "status": "completed",
+      "observedUntilMs": 60000,
+      "proposals": []
+    }
+  ]
+}

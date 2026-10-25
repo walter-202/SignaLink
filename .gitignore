@@ -14,3 +14,5 @@ work/
 /apps/web/public/mediapipe/1.1.1/
 /apps/web/public/models/holistic/
 /apps/web/public/onnxruntime/wasm/
+/model-lab/datasets/private/
+/model-lab/reports/private/

@@ -57,7 +57,14 @@ Al comparar dos clasificadores de señas aisladas, usa las mismas personas de ev
 
 ## Scripts asociados
 
-Los experimentos y sus configuraciones pertenecen a model-lab. No hay un comando único todavía; primero deben definirse el esquema de datos y las particiones aprobadas para evitar una evaluación irreproducible.
+Los experimentos y sus configuraciones pertenecen a `model-lab`.
+`pnpm validate:corpus <manifiesto.json>` audita el esquema propuesto v1 y
+`pnpm evaluate:recognition <manifiesto.json> <ejecucion.json>` evalúa registros
+de propuestas visibles de clasificación aislada: soporte, matriz de confusión,
+F1, abstenciones, fallos, falsas alarmas y latencia con cobertura explícita.
+Consulta `model-lab/README.md` para las definiciones. Los ejemplos son sintéticos;
+no hay runner de inferencia sobre corpus real ni validación lingüística automática.
+Estas métricas no aprueban la meta del 50%, generalización o traducción.
 
 ## Fuentes y fundamentos
 

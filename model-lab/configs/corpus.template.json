@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "lsb-corpus-draft",
+  "language": "LSB",
+  "task": "isolated-sign",
+  "evidence": "recorded",
+  "labels": [],
+  "clips": []
+}

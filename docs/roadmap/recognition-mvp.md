@@ -13,14 +13,18 @@ El protocolo inicial está en [rendimiento](../research/recognition-performance.
 | 1. Medición y captura | Diagnóstico local acotado, captura durante una inferencia pendiente, cancelación y prueba del ONNX real en WASM | Implementada: `e0f7346` |
 | 2. Modelos intercambiables | Registro versionado; contratos comprobados; clasificación, preprocesamiento y política de incertidumbre inyectados; cambio de modelo sin mezclar capturas | Infraestructura implementada y verificada con pruebas de contrato, selección, ONNX real en Chromium y build; solo v4 está instalado |
 | 3. Landmarks y arranque | Perfil de MediaPipe en equipo real; prototipo Worker con fallback; artefacto Holistic fijado por versión/hash y carga/caché medibles | En curso: Worker optativo, carga verificada, caché y diagnóstico implementados; faltan provisionar el Holistic real revisado y benchmark con señas |
-| 4. Corpus y evaluación | 12–20 intenciones administrativas con expresiones LSB validadas; material autorizado; participantes separados entre entrenamiento/evaluación; anotaciones temporales | Pendiente de colaboración lingüística y muestras autorizadas |
+| 4. Corpus y evaluación | 12–20 intenciones administrativas con expresiones LSB validadas; material autorizado; participantes separados entre entrenamiento/evaluación; anotaciones temporales | Contratos, auditor y evaluador JSON implementados y probados con datos sintéticos; colaboración lingüística, corpus real y runner de inferencia pendientes |
 | 5. Modelo ligero y piloto | Comparar TCN, GRU y Conv1D+GRU; exportar ONNX; cuantizar solo si mejora velocidad/calidad; piloto supervisado y respuestas visuales validadas | Depende de la etapa 4 |
 
 Ya se puede [comparar baseline/Worker desde Ajustes](../research/recognition-comparison.md)
 sin reiniciar Next y medir la fluidez separadamente. El comparador local comprueba
 contratos técnicos de los JSON v4; no sustituye el benchmark con corpus. Se incluye
 un protocolo preparatorio en `model-lab/configs/public-service-benchmark.yaml`,
-sin datos, artefactos reales ni un runner lingüístico instalados.
+sin datos, artefactos reales ni un runner de inferencia con corpus instalados.
+El [Model Lab](../../model-lab/README.md) ya audita metadatos y evalúa registros
+de propuestas visibles con matriz de confusión, F1, abstenciones, fallos,
+falsos positivos y latencias con cobertura explícita. Los ejemplos son sintéticos;
+sus cifras no describen precisión ni velocidad de un modelo LSB real.
 
 La recopilación y validación lingüística pueden avanzar mientras se optimiza el
 runtime. No sustituir LSB por pesos LSA ni tratar frases como concatenaciones

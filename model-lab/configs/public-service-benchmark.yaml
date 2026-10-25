@@ -1,5 +1,6 @@
 # Protocolo preparatorio. No lo consume el comparador de JSON ni existe aún
-# un runner con corpus real. Los criterios deben acordarse antes de evaluar.
+# un runner de inferencia con corpus real. El evaluador de registros JSON v1 ya
+# existe; los criterios deben acordarse antes de evaluar datos reales.
 protocol_version: 1
 status: awaiting_authorized_artifacts_and_corpus
 language: LSB
@@ -45,3 +46,9 @@ privacy:
   upload_camera_or_landmarks_by_default: false
   raw_dataset_in_git: false
   diagnostic_exports: aggregate_numeric_and_model_metadata_only
+tooling:
+  corpus_schema_version: 1
+  run_ledger_schema_version: 1
+  audit_command: pnpm validate:corpus
+  ledger_evaluation_command: pnpm evaluate:recognition
+  browser_inference_runner: not_implemented

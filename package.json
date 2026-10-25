@@ -10,6 +10,9 @@
     "build:web": "pnpm --filter @la-voz/web build",
     "lint:web": "pnpm --filter @la-voz/web lint",
     "test:web": "pnpm --filter @la-voz/web test",
-    "e2e:web": "pnpm --filter @la-voz/web test:e2e"
+    "e2e:web": "pnpm --filter @la-voz/web test:e2e",
+    "validate:corpus": "node model-lab/src/evaluation/cli.mjs audit",
+    "evaluate:recognition": "node model-lab/src/evaluation/cli.mjs evaluate",
+    "test:model-lab": "node --test model-lab/tests/*.test.mjs"
   }
 }

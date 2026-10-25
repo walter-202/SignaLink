@@ -57,7 +57,13 @@ Si una misma persona aparece en varias sesiones, todas sus sesiones quedan en un
 
 ## Scripts asociados
 
-No hay un analizador automático de dataset porque el formato aún debe fijarse. Al aprobar el manifiesto, añade un verificador reproducible para duplicados, etiquetas faltantes y cruces de participantes; deja la validez lingüística a revisión humana.
+El esquema propuesto v1 y su auditor están en `model-lab/README.md`. Ejecuta
+`pnpm validate:corpus <manifiesto.json>` para comprobar metadatos, cobertura,
+duplicados declarados por SHA-256 y cruces de participantes. Los hallazgos usan
+índices del manifiesto, sin borrar muestras. `pnpm test:model-lab` verifica el
+contrato con registros sintéticos. La herramienta no abre videos ni certifica
+procedencia, permisos, identidad o validez lingüística; esas revisiones siguen
+siendo externas antes de usar material real.
 
 ## Fuentes y fundamentos
 
