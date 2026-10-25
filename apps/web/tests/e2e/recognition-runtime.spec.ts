@@ -14,6 +14,7 @@ const modules = [
   "application/ports/landmark-detector",
   "infrastructure/mediapipe-holistic-landmark-detector",
   "infrastructure/worker-landmark-detector",
+  "infrastructure/holistic-model-asset",
   "domain/landmarks",
   "domain/model-catalog",
 ];
@@ -46,18 +47,30 @@ test("classic landmark Worker transfers an image and keeps the page responsive d
     contentType: "text/javascript",
     body: `self.Vision = {
       FilesetResolver: { forVisionTasks: async () => ({}) },
-      HolisticLandmarker: { createFromOptions: async () => ({ detectForVideo(bitmap) {
+      HolisticLandmarker: { createFromOptions: async (files, options) => {
+        if (options.baseOptions.modelAssetPath || options.baseOptions.modelAssetBuffer.length !== 4) throw new Error('Expected preloaded model bytes');
+        if (options.baseOptions.delegate === 'GPU') throw new Error('Synthetic GPU failure');
+        return { detectForVideo(bitmap) {
         if (bitmap.width !== 320 || bitmap.height !== 240) throw new Error('Image not transferred');
         const end = performance.now() + 250; while (performance.now() < end) {}
         return { poseLandmarks: [[{ x: 0.5, y: 0.2, z: 0, visibility: 1 }]], leftHandLandmarks: [], rightHandLandmarks: [] };
-      } }) }
+      } }; } }
     };`,
   }));
+  let taskRequests = 0;
+  await context.route("**/__synthetic-holistic.task", (route) => {
+    taskRequests++;
+    return route.fulfill({ contentType: "application/octet-stream", body: Buffer.from([1, 2, 3, 4]) });
+  });
   await page.goto("/login");
   const result = await page.evaluate(async () => {
     const url = "/__recognition-test/infrastructure/worker-landmark-detector";
     const { WorkerLandmarkDetector } = await import(url) as typeof import("../../src/features/sign-recognition/infrastructure/worker-landmark-detector");
-    const detector = new WorkerLandmarkDetector();
+    const assetUrl = "/__recognition-test/infrastructure/holistic-model-asset";
+    const { defineHolisticModelAsset } = await import(assetUrl) as typeof import("../../src/features/sign-recognition/infrastructure/holistic-model-asset");
+    const digest = await crypto.subtle.digest("SHA-256", new Uint8Array([1, 2, 3, 4]));
+    const sha256 = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+    const detector = new WorkerLandmarkDetector(defineHolisticModelAsset({ url: "/__synthetic-holistic.task", version: "synthetic-v1", sha256, bytes: 4 }));
     const canvas = document.createElement("canvas"); canvas.width = 320; canvas.height = 240;
     canvas.getContext("2d")!.fillRect(0, 0, 320, 240);
     const stream = canvas.captureStream(30);
@@ -77,19 +90,17 @@ test("classic landmark Worker transfers an image and keeps the page responsive d
   expect(result.frame).toEqual({ timestampMs: 123, pose: [{ x: 0.5, y: 0.2, z: 0, visibility: 1 }], leftHand: null, rightHand: null });
   expect(result.ticks).toBeGreaterThan(2);
   expect(result.diagnostics.mode).toBe("worker");
+  expect(result.diagnostics.delegate).toBe("CPU");
+  expect(result.diagnostics.asset?.integrity).toBe("verified");
+  expect(taskRequests).toBe(1); // GPU/CPU fallback reuses the same transferred weights.
   expect(result.diagnostics.workerMs).toBeGreaterThanOrEqual(240);
 });
 
-test("real local MediaPipe bundle and WASM bootstrap in the classic Worker and report an invalid task", async ({ page, context, isMobile }) => {
+test("real local MediaPipe bundle and WASM bootstrap in the classic Worker and reject invalid task bytes", async ({ page, context, isMobile }) => {
   test.skip(isMobile, "A second emulated viewport is not another MediaPipe device benchmark.");
   test.setTimeout(90_000);
-  let taskRequests = 0;
   let wasmRequests = 0;
   context.on("request", (request) => { if (request.url().includes("/mediapipe/wasm/") && request.url().endsWith(".wasm")) wasmRequests++; });
-  await context.route("**/__invalid-holistic.task", (route) => {
-    taskRequests++;
-    return route.fulfill({ status: 404, body: "Task intentionally unavailable in bootstrap smoke test" });
-  });
   await page.goto("/login");
   const result = await page.evaluate(async () => {
     const worker = new Worker("/mediapipe/1.1.1/holistic-worker.js");
@@ -97,13 +108,42 @@ test("real local MediaPipe bundle and WASM bootstrap in the classic Worker and r
       return await new Promise<{ type: string; code?: string }>((resolve, reject) => {
         worker.onmessage = ({ data }) => resolve(data);
         worker.onerror = () => reject(new Error("Worker bootstrap failed"));
-        worker.postMessage({ type: "initialize", wasmPath: new URL("/mediapipe/wasm", location.href).href, modelUrl: new URL("/__invalid-holistic.task", location.href).href });
+        const modelBuffer = new Uint8Array([1, 2, 3, 4]).buffer;
+        worker.postMessage({ type: "initialize", wasmPath: new URL("/mediapipe/wasm", location.href).href, modelBuffer }, [modelBuffer]);
       });
     } finally { worker.terminate(); }
   });
   expect(result).toEqual({ type: "error", code: "model-load" });
   expect(wasmRequests).toBeGreaterThan(0);
-  expect(taskRequests).toBeGreaterThan(0);
+});
+
+test("pinned Holistic bytes survive offline cache reads and corrupt cache entries are repaired", async ({ page, context }) => {
+  let reads = 0;
+  await context.route("**/__asset-cache-fixture.task", (route) => {
+    reads++;
+    return route.fulfill({ contentType: "application/octet-stream", body: Buffer.from([1, 2, 3, 4]) });
+  });
+  await page.goto("/login");
+  const load = (corrupt = false) => page.evaluate(async (corrupt) => {
+    const url = "/__recognition-test/infrastructure/holistic-model-asset";
+    const { defineHolisticModelAsset, loadHolisticModelAsset } = await import(url) as typeof import("../../src/features/sign-recognition/infrastructure/holistic-model-asset");
+    const digest = await crypto.subtle.digest("SHA-256", new Uint8Array([1, 2, 3, 4]));
+    const sha256 = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+    if (corrupt) {
+      const cache = await caches.open("signalink-holistic-assets-v1");
+      for (const request of await cache.keys()) await cache.put(request, new Response(new Uint8Array([4, 3, 2, 1])));
+    }
+    const asset = defineHolisticModelAsset({ url: "/__asset-cache-fixture.task", version: "cache-fixture-v1", sha256, bytes: 4 });
+    return (await loadHolisticModelAsset(asset, new AbortController().signal)).diagnostics;
+  }, corrupt);
+  expect((await load()).source).toBe("fetch");
+  await context.setOffline(true);
+  try {
+    expect(await load()).toMatchObject({ source: "cache-storage", integrity: "verified" });
+    expect(reads).toBe(1);
+  } finally { await context.setOffline(false); }
+  expect((await load(true)).source).toBe("fetch");
+  expect(reads).toBe(2);
 });
 
 test("browser pipeline captures during slow synthetic inference and cancels late results", async ({ page }) => {

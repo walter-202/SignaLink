@@ -36,6 +36,7 @@ export class BrowserLandmarkDetector implements LandmarkDetector {
       } catch (cause) {
         this.detector.close();
         if (this.closed) throw cause;
+        if (cause instanceof LandmarkDetectorError && cause.code === "model-integrity") throw cause;
         this.fallback = "worker-initialization";
       }
     } else if (this.options.preferWorker) {

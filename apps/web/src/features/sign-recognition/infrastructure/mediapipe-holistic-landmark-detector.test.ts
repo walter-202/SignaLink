@@ -1,11 +1,69 @@
-import { describe, expect, it } from "vitest";
-import { mapHolisticResult } from "./mediapipe-holistic-landmark-detector";
+import { createHash, webcrypto } from "node:crypto";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { mapHolisticResult, MediaPipeHolisticLandmarkDetector } from "./mediapipe-holistic-landmark-detector";
+import { defineHolisticModelAsset } from "./holistic-model-asset";
+
+const mocks = vi.hoisted(() => ({ create: vi.fn() }));
+vi.mock("@mediapipe/tasks-vision", () => ({
+  FilesetResolver: { forVisionTasks: async () => ({ wasmLoaderPath: "/local.js", wasmBinaryPath: "/local.wasm" }) },
+  HolisticLandmarker: { createFromOptions: mocks.create },
+}));
+const modelBytes = new Uint8Array([1, 2, 3, 4]);
+const asset = defineHolisticModelAsset({ url: "/synthetic.task", version: "fixture-v1", sha256: createHash("sha256").update(modelBytes).digest("hex"), bytes: 4 });
+beforeEach(() => {
+  mocks.create.mockReset();
+  vi.stubGlobal("crypto", webcrypto);
+  vi.stubGlobal("caches", undefined);
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(modelBytes)));
+});
+afterEach(() => { vi.unstubAllGlobals(); });
 
 const landmark = (x: number, y: number, z: number, visibility: number) => ({
   x,
   y,
   z,
   visibility,
+});
+
+it("loads and verifies once, then reuses the same model bytes for GPU/CPU fallback", async () => {
+  const engine = { close: vi.fn() };
+  mocks.create.mockRejectedValueOnce(new Error("GPU unavailable")).mockResolvedValueOnce(engine);
+  const detector = new MediaPipeHolisticLandmarkDetector({ modelAsset: asset });
+  await Promise.all([detector.initialize(), detector.initialize()]);
+  expect(fetch).toHaveBeenCalledOnce();
+  expect(mocks.create).toHaveBeenCalledTimes(2);
+  const gpu = mocks.create.mock.calls[0]![1].baseOptions;
+  const cpu = mocks.create.mock.calls[1]![1].baseOptions;
+  expect(gpu.modelAssetBuffer).toEqual(modelBytes);
+  expect(cpu.modelAssetBuffer.buffer).toBe(gpu.modelAssetBuffer.buffer);
+  expect(gpu).not.toHaveProperty("modelAssetPath");
+  expect(detector.diagnostics()).toMatchObject({ delegate: "CPU", asset: { integrity: "verified" } });
+  detector.close();
+  expect(engine.close).toHaveBeenCalledOnce();
+});
+
+it("never creates a MediaPipe session from bytes with an invalid hash", async () => {
+  vi.mocked(fetch).mockResolvedValue(new Response(new Uint8Array([4, 3, 2, 1])));
+  const detector = new MediaPipeHolisticLandmarkDetector({ modelAsset: asset });
+  await expect(detector.initialize()).rejects.toMatchObject({ code: "model-integrity" });
+  expect(mocks.create).not.toHaveBeenCalled();
+  expect(detector.isReady()).toBe(false);
+  detector.close();
+});
+
+it("aborts a pending download when closed without creating a late detector", async () => {
+  let requestSignal!: AbortSignal;
+  vi.mocked(fetch).mockImplementation((_url, options) => new Promise((_resolve, reject) => {
+    requestSignal = options!.signal!;
+    requestSignal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+  }));
+  const detector = new MediaPipeHolisticLandmarkDetector({ modelAsset: asset });
+  const pending = detector.initialize();
+  await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
+  detector.close();
+  await expect(pending).rejects.toMatchObject({ code: "closed" });
+  expect(requestSignal.aborted).toBe(true);
+  expect(mocks.create).not.toHaveBeenCalled();
 });
 
 describe("mapHolisticResult", () => {

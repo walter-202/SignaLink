@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "copy:mediapipe-wasm": "node scripts/copy-mediapipe-wasm.mjs",
+    "prepare:holistic": "node scripts/prepare-holistic-model.mjs",
     "copy:onnxruntime-wasm": "node scripts/copy-onnxruntime-wasm.mjs",
     "dev": "pnpm copy:mediapipe-wasm && pnpm copy:onnxruntime-wasm && next dev --webpack",
     "dev:turbo": "pnpm copy:mediapipe-wasm && pnpm copy:onnxruntime-wasm && next dev",

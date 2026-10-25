@@ -35,8 +35,9 @@ El baseline conserva MediaPipe síncrono en el hilo principal. Existe un
 [Worker optativo con fallback al iniciar](landmark-worker.md), con una sola
 imagen en tránsito, descarte de resultados de más de 1 s o de una pestaña oculta
 y liberación de recursos al detener. No cambia las 30 observaciones ni las 138
-características. Reutilizar detectores entre rutas y alojar Holistic con versión
-y hash fijos siguen pendientes.
+características. La [carga verificada y caché de Holistic](holistic-assets.md) está
+implementada; falta provisionar el archivo real revisado. Reutilizar detectores
+entre rutas sigue pendiente.
 
 ## Diagnóstico local
 
@@ -46,8 +47,9 @@ analítica. Cada etapa conserva como máximo 120 valores en memoria y exporta
 agregados: total observado, número de muestras retenidas, media, p50 y p95.
 Los percentiles usan el método de rango más próximo sobre las muestras retenidas.
 El informe incluye ID, versión, hash del modelo, esquema de características y dimensiones de entrada para identificar el contrato medido. No se incluyen imágenes, landmarks, tensores, etiquetas, mensajes ni IDs de atención. Al cambiar de modelo se reinicia la medición y se descartan resultados tardíos del anterior.
-El esquema JSON v2 añade `landmarkRuntime`: modo realmente utilizado, delegado
-GPU/CPU y motivo de fallback, sin rutas ni detalles de excepciones.
+El esquema JSON v3 incluye `landmarkRuntime`: modo realmente utilizado, delegado
+GPU/CPU, motivo de fallback y metadatos de integridad/lectura de los pesos, sin
+rutas ni detalles de excepciones.
 La memoria se libera al desmontar el panel; reiniciar la medición limpia contadores.
 
 | Medición | Qué representa |
@@ -57,6 +59,8 @@ La memoria se libera al desmontar el panel; reiniciar la medición limpia contad
 | modelIntegrityMs | Verificación SHA-256 |
 | modelSessionMs | Creación de sesión ONNX y validación de entrada |
 | landmarkLoadMs | Inicialización del detector MediaPipe |
+| landmarkAssetReadMs | Lectura de los pesos de Holistic, incluida búsqueda en caché; HTTP puede usar caché del navegador |
+| landmarkAssetIntegrityMs | Verificación del tamaño y SHA-256 de Holistic cuando está fijado |
 | landmarkMs | Tiempo hasta recibir landmarks; en Worker incluye preparar/transferir la imagen, cómputo y entrega de respuesta |
 | landmarkWorkerMs | Cómputo de `detectForVideo` dentro del Worker; no incluye la transferencia |
 | framePreparationMs | Preparación de ImageBitmap antes de transferirlo |

@@ -3,6 +3,7 @@ import type { LandmarkDetectorDiagnostics } from "./ports/landmark-detector";
 export type RecognitionTiming =
   | "modelLoadMs" | "modelDownloadMs" | "modelIntegrityMs" | "modelSessionMs"
   | "landmarkLoadMs" | "landmarkMs" | "landmarkWorkerMs" | "framePreparationMs" | "featuresMs"
+  | "landmarkAssetReadMs" | "landmarkAssetIntegrityMs"
   | "frameIntervalMs" | "observationMs" | "queueMs" | "inferenceMs"
   | "segmentToPredictionMs";
 
@@ -14,10 +15,13 @@ export type RecognitionCounter =
 export class RecognitionPerformance {
   private timings = new Map<RecognitionTiming, { total: number; values: number[] }>();
   private counters: Partial<Record<RecognitionCounter, number>> = {};
-  private landmarkRuntime: Pick<LandmarkDetectorDiagnostics, "mode" | "delegate" | "fallback"> | null = null;
+  private landmarkRuntime: Pick<LandmarkDetectorDiagnostics, "mode" | "delegate" | "fallback" | "asset"> | null = null;
 
-  setLandmarkRuntime({ mode, delegate, fallback }: LandmarkDetectorDiagnostics): void {
-    this.landmarkRuntime = { mode, delegate, fallback };
+  setLandmarkRuntime({ mode, delegate, fallback, asset }: LandmarkDetectorDiagnostics): void {
+    this.landmarkRuntime = { mode, delegate, fallback, asset: asset ? {
+      integrity: asset.integrity, source: asset.source, version: asset.version,
+      sha256: asset.sha256, bytes: asset.bytes, readMs: asset.readMs, integrityMs: asset.integrityMs,
+    } : undefined };
   }
 
   record(name: RecognitionTiming, milliseconds: number): void {
@@ -53,9 +57,9 @@ export class RecognitionPerformance {
     })) as Partial<Record<RecognitionTiming, { total: number; samples: number; mean: number; p50: number; p95: number }>>;
     const interval = timings.frameIntervalMs?.mean;
     return {
-      schemaVersion: 2,
+      schemaVersion: 3,
       pipelineVersion: "continuous-v2",
-      landmarkRuntime: this.landmarkRuntime ? { ...this.landmarkRuntime } : null,
+      landmarkRuntime: this.landmarkRuntime ? { ...this.landmarkRuntime, asset: this.landmarkRuntime.asset ? { ...this.landmarkRuntime.asset } : undefined } : null,
       sampleLimit: 120,
       processedFps: interval ? 1_000 / interval : null,
       timings,

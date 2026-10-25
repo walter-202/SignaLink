@@ -1,6 +1,7 @@
 import { expect, it, vi } from "vitest";
 import type { LandmarkDetector } from "../application/ports/landmark-detector";
 import { BrowserLandmarkDetector } from "./browser-landmark-detector";
+import { LandmarkDetectorError } from "../application/ports/landmark-detector";
 
 function setup() {
   const main: LandmarkDetector = { initialize: vi.fn(async () => undefined), detect: vi.fn(), close: vi.fn(), isReady: () => true, diagnostics: () => ({ mode: "main-thread", delegate: "GPU" }) };
@@ -48,6 +49,14 @@ it("does not initialize fallback after cancellation", async () => {
   reject(new Error("cancelled"));
   await expect(pending).rejects.toThrow("cancelled");
   expect(test.options.createMain).not.toHaveBeenCalled();
+});
+
+it("fails closed on integrity errors instead of trying an unverified fallback", async () => {
+  const test = setup();
+  vi.mocked(test.worker.initialize).mockRejectedValue(new LandmarkDetectorError("model-integrity"));
+  await expect(test.detector.initialize()).rejects.toMatchObject({ code: "model-integrity" });
+  expect(test.options.createMain).not.toHaveBeenCalled();
+  expect(test.worker.close).toHaveBeenCalledOnce();
 });
 
 it("stops on runtime failure instead of changing detector mid-sequence", async () => {

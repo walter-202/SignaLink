@@ -1,7 +1,7 @@
 import type { HolisticResultLike } from "./mediapipe-holistic-landmark-detector";
 
 export type HolisticWorkerRequest =
-  | { type: "initialize"; wasmPath: string; modelUrl: string }
+  | { type: "initialize"; wasmPath: string; modelBuffer: ArrayBuffer }
   | { type: "detect"; id: number; bitmap: ImageBitmap; timestampMs: number };
 
 export type HolisticWorkerResponse =

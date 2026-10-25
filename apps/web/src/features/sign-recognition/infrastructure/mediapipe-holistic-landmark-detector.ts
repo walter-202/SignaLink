@@ -7,12 +7,11 @@ import {
   type LandmarkDetector,
 } from "../application/ports/landmark-detector";
 import type { LandmarkFrame, LandmarkPoint } from "../domain/landmarks";
+import type { HolisticModelAsset, HolisticAssetDiagnostics } from "../domain/holistic-model-asset";
+import { configuredHolisticModelAsset, loadHolisticModelAsset } from "./holistic-model-asset";
 
 const configuredWasmPath = process.env.NEXT_PUBLIC_MEDIAPIPE_WASM_PATH?.trim();
-const configuredModelUrl = process.env.NEXT_PUBLIC_MEDIAPIPE_HOLISTIC_MODEL_URL?.trim();
 export const DEFAULT_WASM_PATH = configuredWasmPath || "/mediapipe/wasm";
-export const DEFAULT_MODEL_URL = configuredModelUrl
-  || "https://storage.googleapis.com/mediapipe-models/holistic_landmarker/holistic_landmarker/float16/latest/holistic_landmarker.task";
 
 export interface HolisticResultLike {
   poseLandmarks?: NormalizedLandmark[][];
@@ -55,6 +54,7 @@ interface VisionFileset {
 export interface MediaPipeHolisticOptions {
   wasmPath?: string;
   modelUrl?: string;
+  modelAsset?: HolisticModelAsset;
   delegate?: "GPU" | "CPU";
 }
 
@@ -63,13 +63,15 @@ export class MediaPipeHolisticLandmarkDetector implements LandmarkDetector {
   private initializing: Promise<void> | null = null;
   private closed = false;
   private readonly wasmPath: string;
-  private readonly modelUrl: string;
+  private readonly options: MediaPipeHolisticOptions;
+  private downloadController = new AbortController();
+  private assetInfo: HolisticAssetDiagnostics | undefined;
   private readonly preferredDelegate: "GPU" | "CPU";
   private activeDelegate: "GPU" | "CPU" | undefined;
 
   constructor(options: MediaPipeHolisticOptions = {}) {
     this.wasmPath = options.wasmPath ?? DEFAULT_WASM_PATH;
-    this.modelUrl = options.modelUrl ?? DEFAULT_MODEL_URL;
+    this.options = options;
     this.preferredDelegate = options.delegate ?? "GPU";
   }
 
@@ -92,16 +94,22 @@ export class MediaPipeHolisticLandmarkDetector implements LandmarkDetector {
     }
 
     try {
+      const asset = this.options.modelAsset ?? configuredHolisticModelAsset(this.options.modelUrl);
+      const loaded = await loadHolisticModelAsset(asset, this.downloadController.signal);
+      if (this.closed) throw new LandmarkDetectorError("closed");
+      this.assetInfo = loaded.diagnostics;
       const { FilesetResolver } = await import("@mediapipe/tasks-vision");
       const vision = await FilesetResolver.forVisionTasks(this.wasmPath);
+      if (this.closed) throw new LandmarkDetectorError("closed");
 
       let landmarker: HolisticLandmarker;
       try {
-        landmarker = await this.create(vision, this.preferredDelegate);
+        landmarker = await this.create(vision, this.preferredDelegate, loaded.buffer);
         this.activeDelegate = this.preferredDelegate;
       } catch (error) {
         if (this.preferredDelegate === "CPU") throw error;
-        landmarker = await this.create(vision, "CPU");
+        if (this.closed) throw new LandmarkDetectorError("closed");
+        landmarker = await this.create(vision, "CPU", loaded.buffer);
         this.activeDelegate = "CPU";
       }
 
@@ -111,6 +119,7 @@ export class MediaPipeHolisticLandmarkDetector implements LandmarkDetector {
       }
       this.landmarker = landmarker;
     } catch (cause) {
+      if (this.closed) throw new LandmarkDetectorError("closed");
       if (cause instanceof LandmarkDetectorError) throw cause;
       throw new LandmarkDetectorError("model-load", { cause });
     }
@@ -119,11 +128,12 @@ export class MediaPipeHolisticLandmarkDetector implements LandmarkDetector {
   private async create(
     vision: VisionFileset,
     delegate: "GPU" | "CPU",
+    buffer: ArrayBuffer,
   ): Promise<HolisticLandmarker> {
     const { HolisticLandmarker } = await import("@mediapipe/tasks-vision");
     return HolisticLandmarker.createFromOptions(vision, {
       baseOptions: {
-        modelAssetPath: this.modelUrl,
+        modelAssetBuffer: new Uint8Array(buffer),
         delegate,
       },
       runningMode: "VIDEO",
@@ -149,9 +159,10 @@ export class MediaPipeHolisticLandmarkDetector implements LandmarkDetector {
 
   close = (): void => {
     this.closed = true;
+    this.downloadController.abort();
     this.landmarker?.close();
     this.landmarker = null;
   };
 
-  diagnostics = () => ({ mode: "main-thread" as const, delegate: this.activeDelegate });
+  diagnostics = () => ({ mode: "main-thread" as const, delegate: this.activeDelegate, asset: this.assetInfo });
 }

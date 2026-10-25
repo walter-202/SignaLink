@@ -11,6 +11,8 @@ const labels: Partial<Record<RecognitionTiming, string>> = {
   modelIntegrityMs: "Verificación SHA-256",
   modelSessionMs: "Inicialización ONNX",
   landmarkLoadMs: "Carga de landmarks",
+  landmarkAssetReadMs: "Lectura de pesos Holistic",
+  landmarkAssetIntegrityMs: "Verificación SHA-256 de Holistic",
   landmarkMs: "Landmarks hasta recibir resultado",
   landmarkWorkerMs: "Cómputo dentro del Worker",
   framePreparationMs: "Preparación de imagen para Worker",
@@ -45,6 +47,11 @@ export function RecognitionDiagnostics({ metrics, model }: { metrics: Recognitio
         Landmarks: {snapshot.landmarkRuntime.mode === "worker" ? "Worker" : "hilo de la interfaz"}
         {snapshot.landmarkRuntime.delegate ? ` · ${snapshot.landmarkRuntime.delegate}` : ""}.
         {snapshot.landmarkRuntime.fallback ? " Se utilizó el modo compatible al iniciar." : ""}
+      </p>}
+      {snapshot.landmarkRuntime?.asset && <p className="help-text">
+        Pesos Holistic: {snapshot.landmarkRuntime.asset.integrity === "verified" ? "SHA-256 verificado" : "sin hash fijado"}
+        {snapshot.landmarkRuntime.asset.version ? ` · ${snapshot.landmarkRuntime.asset.version}` : ""}.
+        {" "}{snapshot.landmarkRuntime.asset.source === "cache-storage" ? "Leídos de la caché local del modelo." : "Leídos mediante HTTP; puede intervenir la caché del navegador."}
       </p>}
       <p className="help-text">
         {snapshot.processedFps === null ? "Sin fotogramas medidos." : `${snapshot.processedFps.toFixed(1)} FPS procesados.`}

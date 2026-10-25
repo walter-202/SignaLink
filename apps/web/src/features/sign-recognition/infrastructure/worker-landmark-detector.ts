@@ -1,7 +1,9 @@
-import { LandmarkDetectorError, type LandmarkDetector, type LandmarkDetectorDiagnostics } from "../application/ports/landmark-detector";
+import { LandmarkDetectorError, type LandmarkDetector, type LandmarkDetectorDiagnostics, type LandmarkDetectorErrorCode } from "../application/ports/landmark-detector";
 import type { LandmarkFrame } from "../domain/landmarks";
-import { DEFAULT_MODEL_URL, DEFAULT_WASM_PATH, mapHolisticResult } from "./mediapipe-holistic-landmark-detector";
+import { DEFAULT_WASM_PATH, mapHolisticResult } from "./mediapipe-holistic-landmark-detector";
 import type { HolisticWorkerRequest, HolisticWorkerResponse } from "./holistic-worker-protocol";
+import { configuredHolisticModelAsset, loadHolisticModelAsset } from "./holistic-model-asset";
+import type { HolisticModelAsset } from "../domain/holistic-model-asset";
 
 export const HOLISTIC_WORKER_URL = "/mediapipe/1.1.1/holistic-worker.js";
 
@@ -17,6 +19,9 @@ export class WorkerLandmarkDetector implements LandmarkDetector {
   private pending: { id: number; resolve: (frame: LandmarkFrame) => void; reject: (error: Error) => void } | null = null;
   private timeout: ReturnType<typeof setTimeout> | null = null;
   private info: LandmarkDetectorDiagnostics = { mode: "worker" };
+  private downloadController = new AbortController();
+
+  constructor(private readonly asset?: HolisticModelAsset) {}
 
   static supported(): boolean {
     return typeof Worker !== "undefined" && typeof createImageBitmap === "function" && typeof OffscreenCanvas !== "undefined";
@@ -32,18 +37,25 @@ export class WorkerLandmarkDetector implements LandmarkDetector {
     this.initializing = new Promise<void>((resolve, reject) => {
       this.resolveReady = resolve;
       this.rejectReady = reject;
-      try {
-        // A classic worker is required by the pinned MediaPipe WASM loader.
-        this.worker = new Worker(HOLISTIC_WORKER_URL, { name: "signalink-holistic" });
-        this.worker.onmessage = this.onMessage;
-        this.worker.onerror = this.onError;
-        this.worker.onmessageerror = this.onError;
-        this.armTimeout(60_000, "model-load");
-        this.post({ type: "initialize", wasmPath: new URL(DEFAULT_WASM_PATH, location.href).href, modelUrl: new URL(DEFAULT_MODEL_URL, location.href).href });
-      } catch { this.fail("model-load"); }
+      this.armTimeout(60_000, "model-load");
+      void this.load().catch((cause: unknown) => {
+        if (!this.closed) this.fail(cause instanceof LandmarkDetectorError ? cause.code : "model-load");
+      });
     });
     return this.initializing;
   };
+
+  private async load(): Promise<void> {
+    const loaded = await loadHolisticModelAsset(this.asset ?? configuredHolisticModelAsset(), this.downloadController.signal);
+    if (this.closed) throw new LandmarkDetectorError("closed");
+    this.info.asset = loaded.diagnostics;
+    // A classic worker is required by the pinned MediaPipe WASM loader.
+    this.worker = new Worker(HOLISTIC_WORKER_URL, { name: "signalink-holistic" });
+    this.worker.onmessage = this.onMessage;
+    this.worker.onerror = this.onError;
+    this.worker.onmessageerror = this.onError;
+    this.post({ type: "initialize", wasmPath: new URL(DEFAULT_WASM_PATH, location.href).href, modelBuffer: loaded.buffer }, [loaded.buffer]);
+  }
 
   private post(message: HolisticWorkerRequest, transfer: Transferable[] = []): void {
     this.worker!.postMessage(message, transfer);
@@ -107,9 +119,10 @@ export class WorkerLandmarkDetector implements LandmarkDetector {
     this.timeout = null;
   }
 
-  private fail(code: "closed" | "model-load" | "inference"): void {
+  private fail(code: LandmarkDetectorErrorCode): void {
     const error = new LandmarkDetectorError(code);
     this.clearTimeout();
+    this.downloadController.abort();
     this.rejectReady?.(error);
     this.pending?.reject(error);
     this.resolveReady = this.rejectReady = null;

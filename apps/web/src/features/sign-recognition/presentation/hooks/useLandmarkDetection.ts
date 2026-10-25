@@ -37,6 +37,8 @@ function getLandmarkErrorMessage(code: LandmarkDetectorErrorCode): string {
       return "Este navegador no puede cargar los landmarks locales. Puedes escribir la respuesta.";
     case "model-load":
       return "No se pudieron cargar los landmarks. Revisa la conexión o escribe la respuesta.";
+    case "model-integrity":
+      return "El archivo de landmarks no coincide con el modelo configurado. Revisa su versión antes de activar la captura. Puedes escribir la respuesta.";
     case "inference":
       return "La detección de landmarks se detuvo. Detén la cámara y vuelve a intentarlo.";
     case "closed":
@@ -191,7 +193,13 @@ export function useLandmarkDetection({
         if (cancelled) return;
         metrics?.record("landmarkLoadMs", performance.now() - loadingStartedAt);
         const info = detector.diagnostics?.();
-        if (info) metrics?.setLandmarkRuntime(info);
+        if (info) {
+          metrics?.setLandmarkRuntime(info);
+          if (info.asset) {
+            metrics?.record("landmarkAssetReadMs", info.asset.readMs);
+            metrics?.record("landmarkAssetIntegrityMs", info.asset.integrityMs);
+          }
+        }
         setStatus("ready");
         schedule();
       })

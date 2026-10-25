@@ -2,6 +2,11 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { WorkerLandmarkDetector } from "./worker-landmark-detector";
 import type { HolisticWorkerResponse } from "./holistic-worker-protocol";
 
+vi.mock("./holistic-model-asset", () => ({
+  configuredHolisticModelAsset: () => ({ url: "/synthetic.task", pin: null }),
+  loadHolisticModelAsset: vi.fn(async () => ({ buffer: new ArrayBuffer(3), diagnostics: { integrity: "unverified", source: "fetch", bytes: 3, readMs: 1, integrityMs: 0 } })),
+}));
+
 class FakeWorker {
   static instance: FakeWorker;
   onmessage: ((event: MessageEvent<HolisticWorkerResponse>) => void) | null = null;
@@ -19,6 +24,7 @@ async function ready() {
   const detector = new WorkerLandmarkDetector();
   const initialization = detector.initialize();
   expect(detector.initialize()).toBe(initialization);
+  await Promise.resolve();
   FakeWorker.instance.emit({ type: "ready", delegate: "CPU" });
   await initialization;
   return detector;
@@ -70,6 +76,7 @@ it("terminates an unresponsive initializer and rejects on worker errors", async 
   vi.useFakeTimers();
   const detector = new WorkerLandmarkDetector();
   const pending = expect(detector.initialize()).rejects.toMatchObject({ code: "model-load" });
+  await Promise.resolve();
   await vi.advanceTimersByTimeAsync(60_000);
   await pending;
   expect(FakeWorker.instance.terminate).toHaveBeenCalledOnce();

@@ -23,7 +23,7 @@
         const files = await scope.Vision.FilesetResolver.forVisionTasks(data.wasmPath);
         let delegate: "GPU" | "CPU" = "GPU";
         const create = (delegate: "GPU" | "CPU") => scope.Vision.HolisticLandmarker.createFromOptions(files, {
-          baseOptions: { modelAssetPath: data.modelUrl, delegate },
+          baseOptions: { modelAssetBuffer: new Uint8Array(data.modelBuffer), delegate },
           runningMode: "VIDEO",
           minFaceDetectionConfidence: 0.5,
           minPoseDetectionConfidence: 0.5,

@@ -121,6 +121,23 @@ describe("ContinuousRecognitionPipeline", () => {
 });
 
 describe("RecognitionPerformance", () => {
+  it("exports only reviewed asset metadata and isolates snapshots from mutation", () => {
+    const metrics = new RecognitionPerformance();
+    const asset = {
+      integrity: "verified" as const, source: "cache-storage" as const,
+      version: "fixture-v1", sha256: "a".repeat(64), bytes: 4, readMs: 3, integrityMs: 1,
+      url: "https://example.invalid/asset?private-query=do-not-export",
+    };
+    metrics.setLandmarkRuntime({ mode: "worker", delegate: "CPU", asset });
+    const snapshot = metrics.snapshot();
+    expect(snapshot.landmarkRuntime?.asset).not.toHaveProperty("url");
+    expect(JSON.stringify(snapshot)).not.toContain("private-query");
+    snapshot.landmarkRuntime!.asset!.version = "mutated";
+    expect(metrics.snapshot().landmarkRuntime?.asset?.version).toBe("fixture-v1");
+    metrics.reset();
+    expect(metrics.snapshot().landmarkRuntime).toBeNull();
+  });
+
   it("bounds measurements, computes percentiles and exports only numeric aggregates", () => {
     const metrics = new RecognitionPerformance();
     for (let ms = 1; ms <= 200; ms++) metrics.record("inferenceMs", ms);

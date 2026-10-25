@@ -3,6 +3,7 @@ import type { LandmarkFrame } from "../../domain/landmarks";
 export type LandmarkDetectorErrorCode =
   | "not-supported"
   | "model-load"
+  | "model-integrity"
   | "inference"
   | "closed";
 
@@ -31,4 +32,5 @@ export interface LandmarkDetectorDiagnostics {
   fallback?: "unsupported" | "worker-initialization";
   workerMs?: number;
   framePreparationMs?: number;
+  asset?: import("../../domain/holistic-model-asset").HolisticAssetDiagnostics;
 }

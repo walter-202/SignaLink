@@ -65,13 +65,15 @@ El hook prueba captura asíncrona sin colas ni publicación tras desmontar.
 Playwright usa el Worker y adaptador reales con un motor Vision **sintético**
 que ocupa el Worker durante 250 ms: comprueba transferencia de una imagen de
 320×240 y que los temporizadores de la página siguen avanzando. Otra prueba
-carga el bundle y WASM locales reales y comprueba que se llega a solicitar un
-archivo de tarea deliberadamente inexistente, devolviendo `model-load`.
+carga el bundle y WASM locales reales y comprueba el rechazo de bytes de tarea
+deliberadamente inválidos, devolviendo `model-load`.
 Ninguna de estas pruebas ejecuta Holistic sobre señas reales ni mide su precisión.
 El smoke del ONNX real de la etapa anterior se conserva.
 
-Falta fijar una copia autorizada del archivo `holistic_landmarker.task` con
-versión, tamaño y SHA-256 conocidos, además de medir su caché fría/caliente. El
+La [carga verificada y caché de pesos](holistic-assets.md) ya está implementada
+para ambos motores. GPU/CPU usan un buffer único y el adaptador lo transfiere al
+Worker tras verificarlo. Falta provisionar una copia autorizada real del archivo
+`holistic_landmarker.task` con versión, tamaño y SHA-256 conocidos. El
 valor por defecto de ese **archivo de modelo** sigue siendo la URL externa de
 Google con `latest`; el paquete y WASM local no incluyen esos pesos. No se ha
 inventado un hash ni descargado un modelo distinto para aparentar validación.

@@ -62,5 +62,6 @@ Esta decisión no reduce por sí sola la latencia un 50%. Prepara comparaciones 
 modelos sin acoplar la atención a su arquitectura. El
 [prototipo optativo de Worker](../../research/landmark-worker.md) implementa el
 puerto de landmarks asíncrono con fallback al iniciar y una imagen en tránsito.
-La caché verificable de Holistic y la evaluación representativa siguen el
-[roadmap](../../roadmap/recognition-mvp.md).
+La [carga/caché verificable de Holistic](../../research/holistic-assets.md) permite
+provisionar un artefacto revisado sin cambiar el preprocesador. Esa provisión y
+la evaluación representativa siguen el [roadmap](../../roadmap/recognition-mvp.md).
