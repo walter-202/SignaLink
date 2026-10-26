@@ -1,8 +1,8 @@
 # Avatar V5.1: rostro, rig y movimiento del catálogo
 
 El archivo `signalink_avatar_v5_refined.glb` ahora es la revisión V5.1:
-6,987,748 bytes, SHA-256
-`dcb4d20082430e64f8ccb7e572147528a33534b04d938d37a910acb21dc99d9a`.
+6,975,884 bytes, SHA-256
+`5af2f0961479c037bc9cd34c9abd01b45e23e883d4c23fc97dc8f7ed883da8b3`.
 Conserva un skin y 43 articulaciones; contiene 17 pruebas técnicas y `HOLA`
 provisional adaptado desde el avatar propio anterior.
 
@@ -95,3 +95,12 @@ del proyecto Villca. Son material de trabajo para inspeccionar dedos y palma,
 no animaciones lingüísticamente validadas. No se reproducen como traducciones
 en Atención ni están asignadas al catálogo de saludos. Las demás letras y las
 que requieren movimiento quedan pendientes de referencia y revisión.
+
+## Refinamiento visual y acceso desde catálogo
+
+La boca sigue la superficie del rostro con una curva continua y el cabello añade
+mechones fundidos con la capa base, unidos a la cabeza. El estudio B ajusta el pulgar
+hacia la palma; las posturas siguen siendo aproximaciones pendientes de revisión.
+El catálogo permite abrir cada estudio A, B o L en una pestaña independiente
+y el laboratorio selecciona únicamente identificadores de esa lista permitida.
+La sesión de atención queda abierta.

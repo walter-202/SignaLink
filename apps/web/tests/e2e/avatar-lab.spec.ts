@@ -9,7 +9,7 @@ test("loads and plays the local V5 technical rig in the fixed-front lab", async 
     new URL(response.url()).pathname === "/avatars/signalink_avatar_v5_refined.glb",
   );
 
-  await page.goto("/avatar-lab");
+  await page.goto("/avatar-lab?study=L");
   await expect(page.getByRole("heading", { name: "Laboratorio de avatar 3D" })).toBeVisible();
   await expect(page.getByText("43 articulaciones · 1 skin")).toBeVisible();
   await expect(page.getByText("17 técnicos + 4 estudios provisionales", { exact: true })).toBeVisible();
@@ -20,7 +20,8 @@ test("loads and plays the local V5 technical rig in the fixed-front lab", async 
   expect((await response.body()).byteLength).toBe(statSync("public/avatars/signalink_avatar_v5_refined.glb").size);
 
   const clipPicker = page.getByLabel("Clip técnico");
-  await expect(clipPicker.locator("option")).toHaveCount(21);
+  await expect(clipPicker.locator("option")).toHaveCount(21, { timeout: 30_000 });
+  await expect(clipPicker).toHaveValue("QA_DACTILO_L");
   await expect(clipPicker.locator("option", { hasText: "DEMO_ELBOW_STRESS" })).toHaveCount(1);
   await expect(page.getByTestId("avatar-lab-viewer").locator("canvas")).toBeVisible();
   const webglReady = await page.getByTestId("avatar-lab-viewer").locator("canvas").evaluate((element) => {

@@ -41,7 +41,9 @@ export default function AvatarExperience() {
 
   const handleAnimationsLoaded = useCallback((names: string[]) => {
     setClips(names);
-    setSelectedClip((current) => names.includes(current) ? current : names[0] ?? "");
+    const requested = new URLSearchParams(window.location.search).get("study")?.toUpperCase();
+    const study = requested && ["A", "B", "L"].includes(requested) ? `QA_DACTILO_${requested}` : "";
+    setSelectedClip((current) => names.includes(current) ? current : names.includes(study) ? study : names[0] ?? "");
     setIsPlaying(false);
   }, []);
   const handlePlaybackEnded = useCallback(() => setIsPlaying(false), []);
@@ -227,7 +229,7 @@ export default function AvatarExperience() {
             <dl className="avatar-lab-facts" aria-label="Ficha del modelo V5">
               <div><dt>Rig</dt><dd>43 articulaciones · 1 skin</dd></div>
               <div><dt>Clips técnicos</dt><dd>17 técnicos + 4 estudios provisionales</dd></div>
-              <div><dt>Archivo</dt><dd>6.99 MB</dd></div>
+              <div><dt>Archivo</dt><dd>6.98 MB</dd></div>
               <div><dt>Estado</dt><dd>Revisión requerida</dd></div>
             </dl>
           ) : null}

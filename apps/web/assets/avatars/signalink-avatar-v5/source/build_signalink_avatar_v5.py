@@ -212,6 +212,11 @@ def refined_hair():
     axes=[np.arange(a,b,res) for a,b in [(-.25,.255),(1.70,2.09),(-.21,.23)]]
     x,y,z=axes[0][:,None,None],axes[1][None,:,None],axes[2][None,None,:]
     field=ellipsoid_sdf(x,y,z,(0,1.81,.005),(.220,.244,.189))
+    # Blend swept strands into the scalp surface; no floating rigid ribbons.
+    for a,b,r in [((-.15,1.977,.113),(.08,1.985,.117),.024),
+                  ((-.13,2.008,.080),(.09,2.015,.080),.021),
+                  ((-.09,2.035,.035),(.10,2.033,.035),.018)]:
+        field=mix_smin(field,capsule_sdf(x,y,z,a,b,r),.025)
     # One cap, with a clean hairline and no duplicate atlas hair or floating locks.
     hairline=1.872+.049*np.tanh((z-.035)/.065)+.015*np.sin(x*12)
     field=np.maximum(field,hairline-y)
@@ -370,14 +375,18 @@ def build(out,res=.0095):
         points=[(cx+dx,1.875+.011*(1-(dx/.041)**2),.171) for dx in np.linspace(-.041,.041,8)]
         m=base.uv_loft(points,[.008]*8,10,2);delta=np.zeros_like(m.vertices);delta[:,1]=.018
         feature(side+'Brow',m,mat_hair,0,delta)
-    mouth=base.ellipsoid((0,1.696,.186),(.052,.010,.006),3)
-    delta=np.zeros_like(mouth.vertices);delta[:,1]=(mouth.vertices[:,1]-1.696)*1.7
-    feature('MouthOpening',mouth,mat_mouth,3,delta)
-    pts=[(x,1.691+.013*(x/.055)**2,.187-.012*(x/.055)**2) for x in np.linspace(-.055,.055,12)]
-    lip=base.uv_loft(pts,[.0045]*12,10,2);delta=np.zeros_like(lip.vertices);delta[:,1]=-.017
+    # A continuous smile follows the head surface rather than intersecting it.
+    def face_front(x,y):
+        return .025+.170*np.sqrt(max(.01,1-((y-1.775)/.234)**2-(x/.205)**2))
+    xs=np.linspace(-.057,.057,15)
+    mouthpoints=[(x,1.697+.014*(x/.057)**2,face_front(x,1.697+.014*(x/.057)**2)+.006) for x in xs]
+    mouth=base.uv_loft(mouthpoints,[.004+.003*(1-abs(x)/.057) for x in xs],12,2)
+    delta=np.zeros_like(mouth.vertices);delta[:,1]=-.012
+    feature('MouthSmile',mouth,mat_mouth,3,delta)
+    lowerpoints=[(x,1.690+.014*(x/.052)**2,face_front(x,1.690+.014*(x/.052)**2)+.004) for x in np.linspace(-.052,.052,13)]
+    lip=base.uv_loft(lowerpoints,[.003]*13,10,2);delta=np.zeros_like(lip.vertices);delta[:,1]=-.014
     feature('LowerLip',lip,mat_lip,3,delta)
     hd('Hair_ContinuousCap',refined_hair(),mat_hair)
-
     # Animations: all hold rest at t0 and tEnd, with seamless transitions.
     def quata(x=0,y=0,z=0):return base.qxyz((x,y,z))
     def keys(poses):return [(float(t),quata(*angles)) for t,angles in poses]
@@ -446,7 +455,7 @@ def build(out,res=.0095):
                 elif letter=='B': curl=0.64 if finger=='Thumb' else 0.0
                 else: curl=0.0 if finger in ('Thumb','Index') else 0.92
                 angle=curl*([.82,.97,.73][k] if finger!='Thumb' else [.48,.64,.44][k])
-                spread=(-.18 if letter=='L' else .0) if finger=='Thumb' and k==0 else 0.
+                spread=({'L':-.30,'B':.48}.get(letter,0.)) if finger=='Thumb' and k==0 else 0.
                 tracks[node]=keys([(0,(0,0,0)),(.45,(angle,0,spread)),(1.8,(angle,0,spread)),(2.2,(0,0,0))])
         g.add_animation('QA_DACTILO_'+letter,tracks)
         g.doc['animations'][-1]['extras']={'status':'provisional-handshape-study','linguisticValidation':'none','source':'Villca alphabet chart; visual interpretation only'}

@@ -4,6 +4,17 @@ import { describe, expect, it, vi } from "vitest";
 import { LsbExpressionPanel } from "./LsbExpressionPanel";
 
 describe("LsbExpressionPanel", () => {
+  it("opens provisional alphabet studies separately from the attention session", async () => {
+    const user = userEvent.setup();
+    render(<LsbExpressionPanel draft="Hola" />);
+    await user.click(screen.getByText("Explorar dactilología"));
+    for (const letter of ["A", "B", "L"]) {
+      const link = screen.getByRole("link", { name: `Revisar postura ${letter} en el laboratorio 3D` });
+      expect(link).toHaveAttribute("href", `/avatar-lab?study=${letter}`);
+      expect(link).toHaveAttribute("target", "_blank");
+    }
+  });
+
   it("shows a catalog match directly from the response draft", () => {
     const onResolved = vi.fn();
     render(<LsbExpressionPanel draft="Gracias" onResolved={onResolved} />);
