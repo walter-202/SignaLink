@@ -1,0 +1,26 @@
+{
+  "file": "signalink_avatar_v5_refined.glb",
+  "clips": 21,
+  "sampled_poses": 189,
+  "topology": {
+    "Left_SkinnedHandMesh": {
+      "watertight": true,
+      "consistent_winding": true,
+      "vertices": 12868
+    },
+    "Right_SkinnedHandMesh": {
+      "watertight": true,
+      "consistent_winding": true,
+      "vertices": 12868
+    },
+    "HeadFaceSculpted_Skinned": {
+      "watertight": true,
+      "consistent_winding": true,
+      "vertices": 3842
+    }
+  },
+  "maximum_absolute_coordinate_m": 2.054066734294306,
+  "finite_and_bounded": true,
+  "morph_deformation_included": false,
+  "linguistic_validation": false
+}

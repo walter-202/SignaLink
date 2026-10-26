@@ -29,6 +29,7 @@ interface GltfAvatarProps {
   onClipDurations?: (durations: Record<string, number>) => void;
   onPlaybackEnded: () => void;
   autoFrame?: boolean;
+  seekTime?: number;
 }
 
 function setActionPaused(
@@ -50,6 +51,7 @@ export default function GltfAvatar({
   onClipDurations,
   onPlaybackEnded,
   autoFrame = false,
+  seekTime,
 }: GltfAvatarProps) {
   const root = useRef<Group>(null);
   const gltf = useGLTF(modelUrl);
@@ -108,6 +110,12 @@ export default function GltfAvatar({
     isPlayingRef.current = isPlaying;
     setActionPaused(action, !isPlaying);
   }, [action, isPlaying]);
+
+  useEffect(() => {
+    if (!action || seekTime === undefined) return;
+    action.time = MathUtils.clamp(seekTime, 0, action.getClip().duration);
+    mixer.update(0);
+  }, [action, mixer, seekTime]);
 
   useEffect(() => {
     if (action) action.setEffectiveTimeScale(speed);

@@ -17,6 +17,7 @@ interface AvatarSceneProps {
   onClipDurations?: (durations: Record<string, number>) => void;
   onPlaybackEnded: () => void;
   autoFrame?: boolean;
+  seekTime?: number;
 }
 
 function LoadingFigure() {
@@ -80,6 +81,7 @@ export default function AvatarScene(props: AvatarSceneProps) {
             onClipDurations={props.onClipDurations}
             onPlaybackEnded={props.onPlaybackEnded}
             autoFrame={props.autoFrame}
+            seekTime={props.seekTime}
           />
         ) : (
           <ProvisionalAvatar />

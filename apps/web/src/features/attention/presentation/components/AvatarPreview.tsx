@@ -17,7 +17,7 @@ import { resolveAnimationClip } from "@/features/lsb-catalog/application/resolve
 import type { LsbExpression } from "@/features/lsb-catalog/domain/lsb-expression";
 
 const MAX_MODEL_SIZE = 25 * 1024 * 1024;
-const BUNDLED_AVATAR_URL = "/avatars/signalink_avatar.glb";
+const BUNDLED_AVATAR_URL = "/avatars/signalink_avatar_v5_refined.glb";
 const CONFIGURED_MODEL_URL =
   process.env.NEXT_PUBLIC_LSB_AVATAR_MODEL_URL === "off"
     ? null
@@ -357,6 +357,7 @@ export function AvatarPreview({
               <SceneErrorBoundary key={modelUrl} onError={handleModelError}>
                 <AvatarScene
                   modelUrl={modelUrl}
+                  autoFrame={modelUrl === BUNDLED_AVATAR_URL}
                   animationName={selectedClip}
                   isPlaying={isPlaying}
                   isLooping={isLooping}

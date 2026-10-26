@@ -23,6 +23,9 @@ export default function AvatarExperience() {
       ? "SignaLink Avatar V5 · prototipo"
       : CONFIGURED_MODEL_URL ? "Modelo configurado" : null,
   );
+  const [seekTime, setSeekTime] = useState(0);
+  const [restartToken, setRestartToken] = useState(0);
+  const [durations, setDurations] = useState<Record<string, number>>({});
   const [clips, setClips] = useState<string[]>([]);
   const [selectedClip, setSelectedClip] = useState("");
   const [isPlaying, setIsPlaying] = useState(false);
@@ -83,7 +86,7 @@ export default function AvatarExperience() {
     <main className="avatar-page avatar-lab-page">
       <header className="page-heading avatar-lab-heading">
         <div>
-          <p className="eyebrow">Prototipo técnico · V5</p>
+          <p className="eyebrow">Prototipo técnico · V5.1</p>
           <h1>Laboratorio de avatar 3D</h1>
           <p>Revisa el encuadre frontal, la malla y las animaciones del rig en el navegador.</p>
         </div>
@@ -104,6 +107,9 @@ export default function AvatarExperience() {
               isPlaying={isPlaying}
               isLooping={isLooping}
               speed={speed}
+              restartToken={restartToken}
+              seekTime={seekTime}
+              onClipDurations={setDurations}
               autoFrame
               onAnimationsLoaded={handleAnimationsLoaded}
               onPlaybackEnded={handlePlaybackEnded}
@@ -126,7 +132,7 @@ export default function AvatarExperience() {
 
           <div className="avatar-lab-note" role="note">
             <strong>Prototipo, no traductor</strong>
-            <p>Los clips son pruebas de cinemática. No representan señas LSB certificadas ni se conectan a la respuesta de Atención.</p>
+            <p>17 clips prueban el rig; tres estudian las posturas A, B y L de la lámina dactilológica. «HOLA» adapta el clip propio. Todas requieren revisión lingüística LSB.</p>
           </div>
 
           <div className="control-field">
@@ -157,11 +163,12 @@ export default function AvatarExperience() {
               disabled={clips.length === 0}
               onChange={(event) => {
                 setSelectedClip(event.currentTarget.value);
+                setSeekTime(0);
                 setIsPlaying(false);
               }}
             >
               {clips.length === 0 ? <option value="">Sin clips disponibles</option> : null}
-              {clips.map((clip) => <option key={clip} value={clip}>{clip}</option>)}
+              {clips.map((clip) => <option key={clip} value={clip}>{clip === "HOLA" ? "HOLA · catálogo, provisional" : clip.startsWith("QA_DACTILO_") ? `${clip.slice(-1)} · estudio dactilológico provisional` : clip}</option>)}
             </select>
             <p className="help-text">La selección no confirma que el movimiento corresponda a una seña.</p>
           </div>
@@ -179,10 +186,16 @@ export default function AvatarExperience() {
               className="secondary-button"
               type="button"
               disabled={!selectedClip}
-              onClick={() => setIsPlaying(false)}
+              onClick={() => { setIsPlaying(false); setSeekTime(0); setRestartToken((value) => value + 1); }}
             >
               Detener
             </button>
+          </div>
+
+          <div className="control-field">
+            <label htmlFor="avatar-seek">Fotograma de inspección: {seekTime.toFixed(2)} s</label>
+            <input id="avatar-seek" type="range" className="range-control" min="0" max={durations[selectedClip] ?? 0} step="0.01" value={seekTime} disabled={!selectedClip} onChange={(event) => { setIsPlaying(false); setSeekTime(Number(event.currentTarget.value)); }} />
+            <p className="help-text">Pausa y examina cabeza, manos y codos en cualquier punto del clip.</p>
           </div>
 
           <label className="toggle-row avatar-lab-toggle">
@@ -213,8 +226,8 @@ export default function AvatarExperience() {
           {isBundledV5 ? (
             <dl className="avatar-lab-facts" aria-label="Ficha del modelo V5">
               <div><dt>Rig</dt><dd>43 articulaciones · 1 skin</dd></div>
-              <div><dt>Clips técnicos</dt><dd>17</dd></div>
-              <div><dt>Archivo</dt><dd>6.05 MB</dd></div>
+              <div><dt>Clips técnicos</dt><dd>17 técnicos + 4 estudios provisionales</dd></div>
+              <div><dt>Archivo</dt><dd>6.99 MB</dd></div>
               <div><dt>Estado</dt><dd>Revisión requerida</dd></div>
             </dl>
           ) : null}

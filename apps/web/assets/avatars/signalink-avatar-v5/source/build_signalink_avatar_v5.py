@@ -21,7 +21,8 @@ def mesh_weighted(self,name,m,material,joints,weights,uv=None,morphs=None):
     assert weights.shape==(len(vv),4)
     assert len(vv)==len(weights)==len(joints)
     assert np.allclose(weights.sum(axis=1),1,atol=.0001)
-    joints=np.asarray(joints,np.uint16)
+    joints=np.asarray(joints,np.uint16).copy()
+    joints[weights==0]=0
     attr={'POSITION':self.acc(vv,'VEC3',target=34962,extrema=True),
           'NORMAL':self.acc(np.asarray(m.vertex_normals,np.float32),'VEC3',target=34962),
           'JOINTS_0':self.acc(joints,'VEC4',5123,target=34962),
@@ -169,33 +170,64 @@ def jacket_weights(m,idx,total):
 
 def hand_weights(mesh,world_wrist,side,indices,total,segments):
     p=mesh.vertices-np.asarray(world_wrist);num=len(p);x,y,z=p.T
-    # Entire wrist/palm weight plus individual phalange contributions.
-    rows=[(indices[side+'Hand'],np.ones(num,np.float32))]
-    sx=-1 if side=='Left' else 1
-    for fname,segs in segments.items():
-        finger_d=np.min(np.column_stack([dist_segment(p,a,b) for a,b in segs]),axis=1)
-        # blend only near corresponding finger's surface; avoid influence on adjacent digits
-        is_thumb=fname=='Thumb'
-        gate=smoothstep((.038-finger_d)/.017)
-        if is_thumb:
-            gate*=smoothstep(((-sx*x)-.055)/.038)
-        else:
-            gate*=smoothstep((y-.108)/.040)
-            gate*=1-smoothstep((abs(x-segs[0][0][0])-.012)/.027)
-        for k,(a,b) in enumerate(segs):
-            # Gaussian support around each phalanx; adjacent ones overlap to blend at joints
-            cd=dist_segment(p,a,b)
-            cdist=np.linalg.norm(p-(a+b)/2,axis=1)
-            influence=gate*np.exp(-(cd/.042)**2)*np.exp(-(cdist/.077)**2)*7.0
-            rows.append((indices[side+fname+('Metacarpal' if is_thumb and k==0 else ('Proximal' if (is_thumb and k==1) or (not is_thumb and k==0) else ('Intermediate' if not is_thumb and k==1 else 'Distal')))],influence))
-    return weight_packed(rows,total)
+    # Assign each finger to its closest centerline, then blend only across its
+    # own joints. Palm influence fades at the knuckle instead of leaking to tips.
+    names=list(segments)
+    distance=np.column_stack([np.min(np.column_stack([dist_segment(p,a,b) for a,b in segments[f]]),axis=1) for f in names])
+    nearest=np.argmin(distance,axis=1)
+    dense=np.zeros((num,total),np.float32)
+    dense[:,indices[side+'Hand']]=1
+    for fi,fname in enumerate(names):
+        segs=segments[fname]
+        direction=(segs[-1][1]-segs[0][0]);direction/=np.linalg.norm(direction)
+        along=(p-segs[0][0])@direction
+        lengths=np.array([np.linalg.norm(b-a) for a,b in segs])
+        starts=np.r_[0,np.cumsum(lengths)[:-1]]
+        gate=smoothstep((along+.018)/.040)*(nearest==fi)
+        dense[:,indices[side+'Hand']]-=gate
+        # At each joint use a narrow, continuous blend; distal tips remain rigid.
+        transfer=[smoothstep((along-starts[k]+.010)/.020) for k in (1,2)]
+        influences=[1-transfer[0],transfer[0]*(1-transfer[1]),transfer[1]]
+        for k,weight in enumerate(influences):
+            suffix=(['Metacarpal','Proximal','Distal'] if fname=='Thumb' else ['Proximal','Intermediate','Distal'])[k]
+            dense[:,indices[side+fname+suffix]]+=gate*weight
+    return weight_packed([(i,dense[:,i]) for i in range(total)],total)
+
+def refined_face_mesh():
+    # Closed smooth skull with a tapered jaw and a nose built into the surface.
+    m=trimesh.creation.uv_sphere(count=[32,64])
+    v=np.array(m.vertices)
+    y=v[:,2].copy(); x=v[:,0].copy(); z=v[:,1].copy()
+    jaw=.78+.22*smoothstep((y+.9)/.8)
+    v[:,0]=x*.208*jaw;v[:,1]=1.775+y*.234;v[:,2]=.025+z*.170
+    front=smoothstep(z/.6)
+    nose=np.exp(-(v[:,0]/.035)**2-((v[:,1]-1.764)/.052)**2)
+    bridge=np.exp(-(v[:,0]/.024)**2-((v[:,1]-1.805)/.07)**2)
+    v[:,2]+=front*(.047*nose+.013*bridge)
+    m.vertices=v
+    return m
+
+def refined_hair():
+    res=.006
+    axes=[np.arange(a,b,res) for a,b in [(-.25,.255),(1.70,2.09),(-.21,.23)]]
+    x,y,z=axes[0][:,None,None],axes[1][None,:,None],axes[2][None,None,:]
+    field=ellipsoid_sdf(x,y,z,(0,1.81,.005),(.220,.244,.189))
+    # One cap, with a clean hairline and no duplicate atlas hair or floating locks.
+    hairline=1.872+.049*np.tanh((z-.035)/.065)+.015*np.sin(x*12)
+    field=np.maximum(field,hairline-y)
+    vv,ff,_,_=marching_cubes(field,0,spacing=(res,res,res))
+    vv+=np.array([a[0] for a in axes])
+    m=trimesh.Trimesh(vertices=vv,faces=ff,process=True)
+    trimesh.smoothing.filter_taubin(m,iterations=3)
+    if m.volume<0:m.invert()
+    return m
 
 def centered_from_world(n,g,world_parent):
     """Attach world-space rest mesh below animated parent via inverse rest translation."""
     return g.node(n,parent=world_parent,t=tuple(-g.world(world_parent)[:3,3]))
 
 def build(out,res=.0095):
-    out=Path(out);g=GLB();g.doc['asset']['generator']='SignaLink V5 skin-continuity and silhouette build'
+    out=Path(out);g=GLB();g.doc['asset']['generator']='SignaLink V5.1 sculpted face and localized finger skinning'
     mat_skin=g.material('Matte warm skin','#E8AF8D',.79)
     mat_hair=g.material('Deep charcoal hair','#222833',.68)
     mat_high=g.material('Hair charcoal light','#2C3039',.79)
@@ -203,7 +235,9 @@ def build(out,res=.0095):
     mat_shirt=g.material('Warm white shirt','#FCFBF7',.80)
     mat_cuff=g.material('White tailored cuffs','#F5F8F7',.85)
     mat_iris=g.material('Dark glossy eye','#2A2425',.23)
-    face=g.textured_material('Friendly face atlas',Path(__file__).with_name('signalink_avatar_v5_face_atlas.png'))
+    mat_white=g.material('Eye sclera','#FFFAF1',.48)
+    mat_lip=g.material('Soft lips','#B76A57',.7)
+    mat_mouth=g.material('Mouth interior','#572D30',.9)
     atlas=g.textured_material('Teal blazer atlas',Path(__file__).with_name('signalink_avatar_v5_blazer_atlas.png'))
     root=g.node('AvatarRoot')
     nodes={}
@@ -231,10 +265,10 @@ def build(out,res=.0095):
             previous=hand;parts=[];cum=0
             for k,L in enumerate(lns):
                 name=side+fname+['Proximal','Intermediate','Distal'][k]
-                xyz=np.asarray(wrist)+[x,.137+cum,0]
+                xyz=np.asarray(wrist)+[x,.137+cum,.025]
                 nd=bone(name,previous,xyz);previous=nd;parts.append(nd);cum+=L
             fingers[side][fname]=parts
-        previous=hand;cum=np.zeros(3);pt=np.array([-sgn*.072,.052,.009])
+        previous=hand;cum=np.zeros(3);pt=np.array([-sgn*.072,.052,.035])
         parts=[]
         for k,L in enumerate([.051,.042,.035]):
             direction=np.array([-sgn*(.68 if k==0 else .51),(.73 if k==0 else .86),(.11 if k==0 else 0)]);direction/=np.linalg.norm(direction)
@@ -306,38 +340,43 @@ def build(out,res=.0095):
     ni,nw=weight_packed([(idcs['Chest'],.3*(1-h)),(idcs['Neck'],.7*np.ones(len(v))),(idcs['Head'],.3*h)],total)
     mi=g.mesh_weighted('NeckSkinSmooth',neck_mesh,mat_skin,ni,nw)
     g.node('Neck_SkinnedMesh',parent=root,mesh=mi,skin=skin_i)
-    # Face itself is skinned to head instead of orphan rigid node.
-    hm=base.textured_face_mesh();num=len(hm.vertices)
-    ids=np.tile([idcs['Head'],0,0,0],(num,1));ww=np.tile([1,0,0,0],(num,1))
-    hv=np.asarray(hm.vertices)
-    front=smoothstep((hv[:,2]-.10)/.065)
-    brow=np.exp(-((np.abs(hv[:,0])-.096)/.062)**2-((hv[:,1]-1.845)/.041)**2)*front
-    mouth=np.exp(-((np.abs(hv[:,0])-.102)/.054)**2-((hv[:,1]-1.702)/.046)**2)*front
-    brow_delta=np.zeros_like(hv);brow_delta[:,1]=.017*brow
-    smile_delta=np.zeros_like(hv);smile_delta[:,1]=.008*mouth;smile_delta[:,2]=.010*mouth
-    eye_zone=np.exp(-((np.abs(hv[:,0])-.095)/.046)**2-((hv[:,1]-1.796)/.037)**2)*front
-    blink_delta=np.zeros_like(hv);blink_delta[:,1]=-.010*eye_zone;blink_delta[:,2]=.004*eye_zone
-    mouthzone=np.exp(-(hv[:,0]/.105)**2-((hv[:,1]-1.709)/.037)**2)*front
-    mouth_delta=np.zeros_like(hv);mouth_delta[:,1]=.024*np.sign(hv[:,1]-1.709)*mouthzone;mouth_delta[:,2]=.008*mouthzone
-    mi=g.mesh_weighted('HeadFaceUV',hm,face,ids,ww,uv=hm.visual.uv,
-           morphs={'BrowLiftTechnical':brow_delta,'CheekSmileTechnical':smile_delta, 'EyeBlinkTechnical':blink_delta,'MouthOpenTechnical':mouth_delta})
-    face_node=g.node('Head_SkinnedFace',parent=root,mesh=mi,skin=skin_i)
+    # Every visible facial feature follows the same Head skin transform. Actual
+    # geometry replaces the old illustration that duplicated ears/hair on the skull.
+    facial_nodes=[]
+    def feature(name,m,material,morph_index=None,delta=None):
+        num=len(m.vertices); ids=np.tile([idcs['Head'],0,0,0],(num,1));ww=np.tile([1,0,0,0],(num,1))
+        morphs={key:np.zeros((num,3)) for key in ['BrowLiftTechnical','CheekSmileTechnical','EyeBlinkTechnical','MouthOpenTechnical']}
+        if morph_index is not None:morphs[list(morphs)[morph_index]]=delta
+        mi=g.mesh_weighted(name,m,material,ids,ww,morphs=morphs)
+        node=g.node(name+'_Skinned',parent=root,mesh=mi,skin=skin_i)
+        facial_nodes.append(node)
+        return node
+    hm=refined_face_mesh();hv=np.asarray(hm.vertices)
+    d=np.zeros_like(hv);d[:,1]=.008*np.exp(-((abs(hv[:,0])-.10)/.045)**2-((hv[:,1]-1.71)/.04)**2)*smoothstep((hv[:,2]-.10)/.05)
+    face_node=feature('HeadFaceSculpted',hm,mat_skin,1,d)
     head_attach=centered_from_world('HeadAttachedDetails',g,head)
     def hd(name,mesh,material):return g.add_geom(name,mesh,material,head_attach)
     for sign,side in [(-1,'Left'),(1,'Right')]:
-        hd('Ear_'+side,base.ellipsoid((sign*.229,1.737,.028),(.032,.059,.026),3),mat_skin)
-    hd('Hair_Volume',base.ellipsoid((0,1.952,-.031),(.241,.111,.169),4),mat_hair)
-    hd('Hair_Back',base.ellipsoid((.029,1.940,-.111),(.229,.116,.112),3),mat_hair)
-    hd('HairLeft',base.ellipsoid((-.207,1.877,-.025),(.041,.096,.126),3),mat_hair)
-    hd('HairRight',base.ellipsoid((.207,1.879,-.031),(.041,.087,.129),3),mat_hair)
-    # Sculpted locks; all rigid accessories are children of HEAD control, not scene root.
-    lock_specs=[
-        ([(.173,2.012,.091),(.085,2.038,.129),(-.020,2.020,.156),(-.124,1.967,.151)],[.045,.048,.040,.005]),
-        ([(.184,1.990,.100),(.117,2.025,.156),(.018,2.004,.186),(-.065,1.977,.173)],[.035,.042,.033,.003]),
-        ([(.125,2.043,.059),(.010,2.062,.128),(-.090,2.038,.181),(-.173,1.973,.154)],[.039,.052,.041,.006]),
-        ([(-.192,1.958,.090),(-.176,2.015,.162),(-.113,2.015,.199),(-.055,1.969,.198)],[.026,.045,.029,.004]),
-        ([(.092,2.023,.083),(.177,2.033,.104),(.223,1.984,.122),(.222,1.913,.116)],[.030,.048,.029,.004]),]
-    for i,(pts,rr) in enumerate(lock_specs):hd('SculptedHairLock_'+str(i+1),base.uv_loft(pts,rr,14,6),mat_hair if i%2 else mat_high)
+        hd('Ear_'+side,base.ellipsoid((sign*.204,1.758,.012),(.026,.047,.022),3),mat_skin)
+        cx=sign*.080;cy=1.810
+        for name,center,radii,material in [
+            ('Sclera',(cx,cy,.182),(.041,.047,.018),mat_white),
+            ('Iris',(cx,cy,.198),(.022,.030,.007),mat_iris),
+            ('Pupil',(cx,cy,.204),(.012,.021,.004),mat_hair),
+            ('Catchlight',(cx-.007,cy+.012,.208),(.006,.008,.003),mat_white)]:
+            m=base.ellipsoid(center,radii,3);delta=np.zeros_like(m.vertices)
+            delta[:,1]=-(m.vertices[:,1]-cy)*.96
+            feature(side+name,m,material,2,delta)
+        points=[(cx+dx,1.875+.011*(1-(dx/.041)**2),.171) for dx in np.linspace(-.041,.041,8)]
+        m=base.uv_loft(points,[.008]*8,10,2);delta=np.zeros_like(m.vertices);delta[:,1]=.018
+        feature(side+'Brow',m,mat_hair,0,delta)
+    mouth=base.ellipsoid((0,1.696,.186),(.052,.010,.006),3)
+    delta=np.zeros_like(mouth.vertices);delta[:,1]=(mouth.vertices[:,1]-1.696)*1.7
+    feature('MouthOpening',mouth,mat_mouth,3,delta)
+    pts=[(x,1.691+.013*(x/.055)**2,.187-.012*(x/.055)**2) for x in np.linspace(-.055,.055,12)]
+    lip=base.uv_loft(pts,[.0045]*12,10,2);delta=np.zeros_like(lip.vertices);delta[:,1]=-.017
+    feature('LowerLip',lip,mat_lip,3,delta)
+    hd('Hair_ContinuousCap',refined_hair(),mat_hair)
 
     # Animations: all hold rest at t0 and tEnd, with seamless transitions.
     def quata(x=0,y=0,z=0):return base.qxyz((x,y,z))
@@ -397,6 +436,20 @@ def build(out,res=.0095):
             tracks[nodes[part]]=keys(ps)
         g.add_animation(name,tracks)
     for nam,dur in clipdefs:track(nam,dur)
+    # Provisional static handshape studies derived from the visible alphabet
+    # chart, for human review only. They are NOT linked to the LSB catalog.
+    for letter in ('A','B','L'):
+        tracks={}
+        for finger,arr in fingers['Left'].items():
+            for k,node in enumerate(arr):
+                if letter=='A': curl=0.04 if finger=='Thumb' else 0.92
+                elif letter=='B': curl=0.64 if finger=='Thumb' else 0.0
+                else: curl=0.0 if finger in ('Thumb','Index') else 0.92
+                angle=curl*([.82,.97,.73][k] if finger!='Thumb' else [.48,.64,.44][k])
+                spread=(-.18 if letter=='L' else .0) if finger=='Thumb' and k==0 else 0.
+                tracks[node]=keys([(0,(0,0,0)),(.45,(angle,0,spread)),(1.8,(angle,0,spread)),(2.2,(0,0,0))])
+        g.add_animation('QA_DACTILO_'+letter,tracks)
+        g.doc['animations'][-1]['extras']={'status':'provisional-handshape-study','linguisticValidation':'none','source':'Villca alphabet chart; visual interpretation only'}
     for name,index in [('DEMO_BROW_LIFT',0),('DEMO_CHEEK_SMILE',1),('DEMO_EYE_BLINK',2),('DEMO_MOUTH_OPEN',3)]:
         moments=np.array([0.,.45,.8,1.35,1.8],np.float32)
         weights=np.zeros((5,4),np.float32)
@@ -404,13 +457,27 @@ def build(out,res=.0095):
         anim={'name':name,'samplers':[{'input':g.acc(moments,'SCALAR',extrema=True),
                                       'output':g.acc(weights.reshape(-1),'SCALAR'),
                                       'interpolation':'LINEAR'}],
-              'channels':[{'sampler':0,'target':{'node':face_node,'path':'weights'}}]}
+              'channels':[{'sampler':0,'target':{'node':n,'path':'weights'}} for n in facial_nodes]}
         g.doc['animations'].append(anim)
-    g.doc['asset']['copyright']='Procedural SignaLink V4 demonstration; LSB motions not linguistically validated.'
-    g.doc['extras']={'project':'SignaLink','version':'v5-refined-rig','scope':'technology and UX QA; not LSB interpretation',
+    from retarget_hola import add_hola
+    add_hola(g,nodes,Path(__file__).resolve().parents[4]/'public/avatars/signalink_avatar.glb')
+    # glTF material factors are linear; atlas pixels remain in their sRGB texture.
+    for material in g.doc['materials']:
+        pbr=material['pbrMetallicRoughness']
+        if 'baseColorTexture' not in pbr:
+            rgb=pbr['baseColorFactor'][:3]
+            pbr['baseColorFactor'][:3]=[v/12.92 if v<=.04045 else ((v+.055)/1.055)**2.4 for v in rgb]
+    g.doc['asset']['copyright']='Procedural SignaLink V5.1 demonstration; LSB motions not linguistically validated.'
+    g.doc['extras']={'project':'SignaLink','version':'v5.1-sculpted-face-rig','scope':'technology and UX QA; not LSB interpretation',
       'status':'needs-real-device-and-linguistic-validation', 'isValidatedLSB':False,'coordinateSystem':'Y up, +Z forward',
       'improvements':['single humanoid hierarchy','continuous jacket and sleeves surface','weighted shoulders and elbows','watertight palms and fingers','shared full-body skin','skinned lapels and collar','smoother fingertips and shoulders','four facial technical morph targets'],
       'limits':['facial morphs are only preliminary, not full LSB nonmanual markers','procedural silhouette, not faithful film-quality sculpt','clips are technical demonstrations']}
+    # Skinned mesh transforms are ignored by glTF; put them at scene root.
+    for i,n in enumerate(g.doc['nodes']):
+        if 'skin' in n:
+            g.doc['nodes'][root]['children'].remove(i)
+            g.doc['scenes'][0]['nodes'].append(i)
+            g.parents[i]=None
     path=g.save(out)
     meta={'file':path.name,'bytes':path.stat().st_size,'sha256':hashlib.sha256(path.read_bytes()).hexdigest(),
           'nodes':len(g.doc['nodes']),'skins':len(g.doc['skins']),'jointCount':len(rig),'skinnedMeshNames':[n['name'] for n in g.doc['nodes'] if 'skin' in n],

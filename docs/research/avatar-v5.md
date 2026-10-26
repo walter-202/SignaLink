@@ -1,36 +1,97 @@
-# Revisión técnica del avatar V5
+# Avatar V5.1: rostro, rig y movimiento del catálogo
 
-V5 está integrado en `/avatar-lab` para revisar el rig y sus clips en Three.js.
-La vista adopta un encuadre frontal que se ajusta al tamaño del modelo y a la
-relación de aspecto. El archivo no se carga en la atención ni altera el modelo
-de demostración asociado a `HOLA`.
+El archivo `signalink_avatar_v5_refined.glb` ahora es la revisión V5.1:
+6,987,748 bytes, SHA-256
+`dcb4d20082430e64f8ccb7e572147528a33534b04d938d37a910acb21dc99d9a`.
+Conserva un skin y 43 articulaciones; contiene 17 pruebas técnicas y `HOLA`
+provisional adaptado desde el avatar propio anterior.
 
-La inspección independiente del contenedor GLB confirmó que es glTF 2.0, pesa
-6,051,776 bytes, coincide con el manifiesto actualizado y su SHA-256
-`d188c1678608997e941795c9a09d8eeeae0a619c1710038841cc9a92fbf7ad29`, y contiene
-un skin, 43 articulaciones y 17 clips. No contiene un clip llamado `HOLA`. El
-kit reporta manos cerradas y pesos normalizados; preservamos esos datos en
-[`qa/`](../../apps/web/assets/avatars/signalink-avatar-v5/qa/), pero no repetimos
-esa auditoría geométrica en este cambio.
+## Correcciones
 
-Añadimos los límites de los cuatro morph targets faciales al GLB y a su
-generador: Three.js había advertido que esos accessors `POSITION` no declaraban
-`min`/`max`.
+- El rostro deja de proyectar una ilustración con pelo y orejas sobre una esfera.
+  Cráneo, nariz, ojos, cejas, boca y cabello usan geometría y siguen Head.
+- Cabello continuo y unión cuello/cabeza más limpia durante el giro.
+- Los pivotes de dedos coinciden con su eje geométrico. Los pesos se mezclan
+  dentro de cada dedo; la palma deja de influir sobre todas las falanges.
+- Las pruebas faciales actúan sobre los elementos visibles: cierre de ojos,
+  cejas y boca, además de la piel. Son controles técnicos limitados.
+- `HOLA` transfiere direcciones de articulaciones y marcos de palma de la
+  animación propia anterior; no copia quaterniones entre rigs incompatibles.
+- `/avatar-lab` permite pausar en un tiempo exacto y reiniciar de verdad.
+- Atención usa V5.1 bajo demanda para `HOLA`; las otras expresiones sin clip
+  conservan su estado de no disponibilidad y el texto visible.
 
-El laboratorio verifica la carga y reproducción real del GLB en Three.js. No
-sustituye el Khronos glTF Validator, QA en móvil, revisión artística ni validación
-con personas usuarias de LSB. Los clips `DEMO_*` son ejercicios de rig y no
-representan señas validadas. El auditor suministrado dejó el release gate como
-`REVIEW_REQUIRED`.
+## Evidencia
 
-La prueba E2E del visor puede repetirse con:
+`qa/khronos-v5.1.json`: validador oficial Khronos glTF Validator,
+0 errores, 0 advertencias y 3 avisos informativos por materiales sin uso.
+`qa/deformation-v5.1.json`: 189 poses muestreadas en 21 clips, coordenadas
+finitas/acotadas; cabeza y ambas manos cerradas y de winding consistente.
+Esta prueba CPU evalúa skinning, no las deformaciones de morph targets.
 
-```sh
-pnpm --filter @la-voz/web test:e2e:avatar-lab
-```
+E2E local con Chromium/WebGL: carga del GLB y clips, reproducción/pausa,
+inspección de giro de cabeza, puño, muñeca, parpadeo y HOLA.
+La prueba autenticada intentó iniciar sesión con la cuenta facilitada y quedó
+bloqueada en la petición de Auth por `ERR_TUNNEL_CONNECTION_FAILED`. No se
+modificaron permisos ni se guardaron credenciales.
 
-También se ejecutó en el proyecto móvil emulado de Playwright. Eso confirma el
-render del navegador en ambos viewports, no una prueba en un teléfono físico.
+## Límites lingüísticos
 
-El manifiesto, scripts de construcción, atlas y QA entregada con el kit se
-conservan en [`apps/web/assets/avatars/signalink-avatar-v5/`](../../apps/web/assets/avatars/signalink-avatar-v5/).
+El catálogo cita el Módulo 1, pero no conserva los videos de referencia.
+La adaptación de HOLA mantiene la intención del clip provisional; no constituye
+una corrección lingüística contrastada ni una seña LSB validada. Para revisar
+configuración, orientación, ubicación, trayectoria, contacto y componentes no
+manuales necesitamos una ejecución LSB de referencia y revisión competente.
+Los otros 18 saludos aún no tienen clips disponibles. No se asignan pruebas
+`DEMO_*` a sus etiquetas.
+
+El ONNX de referencia (7,206,466 bytes) tiene entrada `[1,30,138]` y salida
+`[1,58]`, verificadas cargando el archivo con ONNX Runtime. Es un clasificador:
+no contiene un diccionario de animaciones ni genera poses 3D. Puede apoyar
+el análisis de capturas, pero no certificar las animaciones del avatar.
+
+Ruta recomendada: referencia autorizada LSB → landmarks originales 3D de manos,
+pose y rostro → adaptación al rig/IK y corrección de contactos → revisión LSB →
+clip identificado exactamente en el catálogo. Las 138 características del
+clasificador no bastan para reconstruir todas las articulaciones y la cara.
+
+## Revisión adicional del proyecto Villca (26-10-2026)
+
+La captura de la interfaz y su lámina coinciden con
+[`imagenes/abecedario.png`](https://github.com/freddxvill/Proyecto_Traductor_de_la_LSB/blob/50ea19478709fcbb9f9ac4584f4d27ed59329c4f/imagenes/abecedario.png).
+La lámina es una referencia visual de dactilología y números, no contiene los
+saludos; algunas letras muestran flechas y requieren movimiento. La imagen sola
+no aporta profundidad, cronología completa, ni expresa licencia o procedencia
+individual de las fotografías. No se redistribuye en SignaLink.
+
+El [README upstream](https://github.com/freddxvill/Proyecto_Traductor_de_la_LSB/blob/50ea19478709fcbb9f9ac4584f4d27ed59329c4f/README.md)
+declara 5.800 secuencias, 58 clases y gestos estáticos y dinámicos. El
+[notebook de captura](https://github.com/freddxvill/Proyecto_Traductor_de_la_LSB/blob/50ea19478709fcbb9f9ac4584f4d27ed59329c4f/utils/Recolecion_Secuencias_datos.ipynb)
+muestra extracción de 138 características por fotograma y guardado Zarr/NumPy.
+El árbol revisado incluye el notebook y los modelos, pero no los archivos Zarr,
+las grabaciones originales ni clips de ejecución de saludos. No consta que se
+conserven videos; el notebook mostrado guarda características procesadas.
+
+El [código de clases](https://github.com/freddxvill/Proyecto_Traductor_de_la_LSB/blob/50ea19478709fcbb9f9ac4584f4d27ed59329c4f/clases.py)
+asigna `HOLA=39`, `BUENOS DIAS=40`, `GRACIAS=41`, `POR FAVOR=42` y `NOMBRE=50`.
+Esas salidas son etiquetas de reconocimiento; no contienen la ejecución de
+esas señas. Hay discrepancias en la tabla del README: presenta `P` tanto para
+27 como para 28, mientras el código asigna `P=27` y `Q=28`; el índice 0 se
+escribe `O` en código y `0` en la tabla. Se debe aclarar con el autor antes de
+considerar la clase 0 un número o una letra. La lámina incluye CH y RR, pero
+no aparecen como clases separadas en el diccionario del modelo.
+
+Siguiente paso útil: contrastar las posturas dactilológicas de la lámina con
+una referencia autorizada y una persona competente en LSB; para saludos se
+requieren videos u otro material específico. Solicitar al autor información
+sobre el corpus y sus permisos puede ayudar, pero incluso el Zarr procesado no
+recupera íntegramente el 3D ni los componentes faciales.
+
+## Estudios de posturas A, B y L
+
+El laboratorio incorpora `QA_DACTILO_A`, `QA_DACTILO_B` y `QA_DACTILO_L`:
+posturas manuales aproximadas, interpretadas visualmente a partir de la lámina
+del proyecto Villca. Son material de trabajo para inspeccionar dedos y palma,
+no animaciones lingüísticamente validadas. No se reproducen como traducciones
+en Atención ni están asignadas al catálogo de saludos. Las demás letras y las
+que requieren movimiento quedan pendientes de referencia y revisión.
