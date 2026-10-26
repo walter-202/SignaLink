@@ -247,6 +247,17 @@ export function LsbExpressionPanel({
           : `Ver las ${LSB_EXPRESSIONS.length} expresiones`}
       </button>
 
+      <details className="lsb-source-details">
+        <summary>Explorar dactilología</summary>
+        <p>Estudios provisionales basados en la lámina del alfabeto boliviano. Requieren revisión LSB y no forman palabras automáticamente.</p>
+        <p><a href="https://github.com/freddxvill/Proyecto_Traductor_de_la_LSB/blob/50ea19478709fcbb9f9ac4584f4d27ed59329c4f/imagenes/abecedario.png" target="_blank" rel="noopener noreferrer">Ver lámina de referencia</a></p>
+        <p>
+          {["A", "B", "L"].map((letter) => (
+            <a key={letter} href={`/avatar-lab?study=${letter}`} target="_blank" rel="noopener noreferrer" aria-label={`Revisar postura ${letter} en el laboratorio 3D`} style={{ marginRight: "1rem" }}>{letter}</a>
+          ))}
+        </p>
+      </details>
+
       {listVisible ? (
         <div
           className="frequent-phrases lsb-catalog-list"

@@ -2,7 +2,7 @@
 
 - `signalink_avatar.glb`: avatar exportado desde MakeHuman/MPFB con el clip `HOLA` (20,540,968 bytes).
 - La fuente de Blender está en [`apps/web/assets/avatars/signalink_avatar_source.blend`](../../assets/avatars/signalink_avatar_source.blend) con la acción `HOLA`; se guarda fuera de `public` para evitar descargarla desde la aplicación.
-- `signalink_avatar_v5_refined.glb`: revisión V5.1 con rostro geométrico, 43 articulaciones, 17 clips técnicos, tres estudios dactilológicos y HOLA provisional adaptado del anterior (6,987,748 bytes). Se usa bajo demanda en Atención para Hola y en `/avatar-lab`. Los clips técnicos no se asocian con expresiones LSB.
+- `signalink_avatar_v5_refined.glb`: revisión V5.1 con rostro geométrico, 43 articulaciones, 17 clips técnicos, tres estudios dactilológicos y HOLA provisional adaptado del anterior (6,975,884 bytes). Se usa bajo demanda en Atención para Hola y en `/avatar-lab`. Los clips técnicos no se asocian con expresiones LSB.
 
 Los assets base y la salida del avatar son CC0 según la licencia de MakeHuman/MPFB.
 El código de MPFB (GPL) y MakeHuman (AGPL) no se redistribuye en este repositorio.

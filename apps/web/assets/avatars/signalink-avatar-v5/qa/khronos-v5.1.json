@@ -2,7 +2,7 @@
   "uri": "signalink_avatar_v5_refined.glb",
   "mimeType": "model/gltf-binary",
   "validatorVersion": "2.0.0-dev.3.10",
-  "validatedAt": "2026-10-26T20:20:36.593Z",
+  "validatedAt": "2026-10-26T20:46:21.498Z",
   "issues": {
     "numErrors": 0,
     "numWarnings": 0,
@@ -38,7 +38,7 @@
         "pointer": "/buffers/0",
         "mimeType": "application/gltf-buffer",
         "storage": "glb",
-        "byteLength": 6706944
+        "byteLength": 6695088
       },
       {
         "pointer": "/images/0",
@@ -61,8 +61,8 @@
     "hasTextures": true,
     "hasDefaultScene": true,
     "drawCallCount": 24,
-    "totalVertexCount": 79426,
-    "totalTriangleCount": 158744,
+    "totalVertexCount": 79590,
+    "totalTriangleCount": 159072,
     "maxUVs": 1,
     "maxInfluences": 4,
     "maxAttributes": 5
