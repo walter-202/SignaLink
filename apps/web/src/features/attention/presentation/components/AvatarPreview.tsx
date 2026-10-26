@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type ReactNode,
 } from "react";
 import { Hand, Maximize, Pause, Play, Repeat, Square, Upload } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -34,6 +35,11 @@ interface AvatarPreviewProps {
   isDraftMatch?: boolean;
   autoStart?: boolean;
   onClipsLoaded?: (clips: readonly string[] | null) => void;
+  /**
+   * Catalog controls rendered inside this card. When present, the card hides
+   * its own summary because the catalog already names the selected expression.
+   */
+  catalog?: ReactNode;
 }
 
 function formatTime(value: number): string {
@@ -49,6 +55,7 @@ export function AvatarPreview({
   isDraftMatch = false,
   autoStart = false,
   onClipsLoaded,
+  catalog,
 }: AvatarPreviewProps = {}) {
   const [modelUrl, setModelUrl] = useState<string | null>(null);
   const [modelName, setModelName] = useState("");
@@ -250,7 +257,7 @@ export function AvatarPreview({
     statusMessage =
       CONFIGURED_MODEL_URL === BUNDLED_AVATAR_URL
         ? (isDraftMatch ? "Coincidencia exacta: «Hola»." : "Clip de «Hola» disponible.") +
-          " El modelo se carga bajo demanda (20.5 MB)."
+          " El modelo se carga bajo demanda (6.05 MB)."
         : (isDraftMatch
             ? "Coincidencia exacta del catálogo."
             : "Expresión seleccionada del catálogo.") +
@@ -276,9 +283,15 @@ export function AvatarPreview({
       "». Animación pendiente de implementación.";
   }
 
+  const showStatusNote =
+    !catalog || Boolean(expression) || Boolean(activeModelError);
+
   return (
     <section
-      className="panel-card avatar-preview-card"
+      className={
+        "panel-card avatar-preview-card" +
+        (catalog ? " avatar-preview-card--integrated" : "")
+      }
       aria-labelledby="avatar-preview-title"
     >
       <header className="compact-card-heading">
@@ -292,46 +305,57 @@ export function AvatarPreview({
             : "Sin traducción"}
         </span>
       </header>
-      <div className="avatar-preview-summary">
-        <span className="avatar-summary-icon" aria-hidden="true">
-          <Play size={17} />
-        </span>
-        <div className="avatar-summary-copy">
-          <span className="field-label">
-            {isDraftMatch
-              ? "Coincidencia exacta del borrador"
-              : expression
-                ? "Expresión seleccionada"
-                : "Coincidencia del borrador"}
+      {catalog ? (
+        <div className="avatar-preview-catalog">{catalog}</div>
+      ) : (
+        <div className="avatar-preview-summary">
+          <span className="avatar-summary-icon" aria-hidden="true">
+            <Play size={17} />
           </span>
-          <strong>
-            {expression ? "«" + expression.spanish + "»" : "Sin coincidencia exacta"}
-          </strong>
-          <span>
-            {expression?.animationStatus === "provisional"
-              ? "Clip disponible · requiere revisión lingüística"
-              : expression
-                ? "Expresión documentada; su clip 3D no está disponible."
-                : "La respuesta solo se anima si coincide con el catálogo."}
-          </span>
+          <div className="avatar-summary-copy">
+            <span className="field-label">
+              {isDraftMatch
+                ? "Coincidencia exacta del borrador"
+                : expression
+                  ? "Expresión seleccionada"
+                  : "Coincidencia del borrador"}
+            </span>
+            <strong>
+              {expression
+                ? "«" + expression.spanish + "»"
+                : "Sin coincidencia exacta"}
+            </strong>
+            <span>
+              {expression?.animationStatus === "provisional"
+                ? "Clip disponible · requiere revisión lingüística"
+                : expression
+                  ? "Expresión documentada; su clip 3D no está disponible."
+                  : "La respuesta solo se anima si coincide con el catálogo."}
+            </span>
+          </div>
         </div>
+      )}
+      <div className="avatar-preview-action">
+        {showStatusNote ? (
+          <p
+            className="avatar-expression-note"
+            role={activeModelError ? "alert" : "status"}
+          >
+            {statusMessage}
+          </p>
+        ) : null}
+        <Button
+          size="small"
+          variant="secondary"
+          onClick={openPreview}
+          aria-describedby="avatar-load-help"
+        >
+          {isLoadingModel ? "Cargando avatar…" : "Abrir escena 3D"}
+        </Button>
       </div>
-      <p
-        className="avatar-expression-note"
-        role={activeModelError ? "alert" : "status"}
-      >
-        {statusMessage}
-      </p>
-      <Button
-        size="small"
-        variant="secondary"
-        onClick={openPreview}
-        aria-describedby="avatar-load-help"
-      >
-        {isLoadingModel ? "Cargando avatar…" : "Abrir escena 3D"}
-      </Button>
       <span className="sr-only" id="avatar-load-help">
-        El modelo se procesa en este navegador. El único clip incluido es «Hola» y todavía no tiene validación lingüística.
+        El modelo se procesa en este navegador y el clip solo se reproduce si el
+        modelo lo contiene. Las animaciones no tienen validación lingüística.
       </span>
 
       <Dialog

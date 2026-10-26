@@ -227,6 +227,19 @@ describe("AvatarPreview", () => {
     ).toBeDisabled();
   });
 
+  it("integrates the catalog in the card without repeating the summary", async () => {
+    const { AvatarPreview } = await import("./AvatarPreview");
+    render(<AvatarPreview catalog={<div>Catálogo dentro de la vista</div>} />);
+
+    expect(screen.getByText("Catálogo dentro de la vista")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Sin coincidencia exacta"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Escribe una expresión exacta del catálogo/),
+    ).not.toBeInTheDocument();
+  });
+
   it("states when an expression has no mapped animation", async () => {
     await renderPreview(
       expression({ animationClipId: null, animationSource: null }),

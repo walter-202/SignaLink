@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useId, useState, type FormEvent } from "react";
 import { Hand, Search } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import {
@@ -25,6 +25,18 @@ interface LsbExpressionPanelProps {
   draft: string;
   availableModelClips?: readonly string[] | null;
   onResolved?: (expression: LsbExpression | null, sourceDraft?: string) => void;
+  /**
+   * Omits the card chrome so the catalog can live inside the response 3D view.
+   * The search, result and list keep the same behavior.
+   */
+  embedded?: boolean;
+  /** Shared selection so two catalog instances stay in sync. */
+  selection?: {
+    expression: LsbExpression;
+    sourceDraft: string | null;
+  } | null;
+  /** Opens the expression list on first render. */
+  defaultCatalogOpen?: boolean;
 }
 
 function announce(resolution: LsbResolution | null): string {
@@ -57,11 +69,17 @@ export function LsbExpressionPanel({
   draft,
   availableModelClips = null,
   onResolved,
+  embedded = false,
+  selection = null,
+  defaultCatalogOpen = false,
 }: LsbExpressionPanelProps) {
+  const uid = useId();
+  const queryInputId = `${uid}-query`;
+  const listId = `${uid}-list`;
   const [query, setQuery] = useState("");
   const [resolution, setResolution] = useState<LsbResolution | null>(null);
   const [resolutionDraft, setResolutionDraft] = useState<string | null>(null);
-  const [catalogOpen, setCatalogOpen] = useState(false);
+  const [catalogOpen, setCatalogOpen] = useState(defaultCatalogOpen);
   const matches = searchLsbExpressions(query);
   const draftResolution = resolveLsbExpression(draft);
   const hasDraftMatch = draftResolution.status === "matched";
@@ -112,23 +130,14 @@ export function LsbExpressionPanel({
       : "lsb-catalog-availability lsb-catalog-availability--missing";
   }
 
-  return (
-    <section
-      className="panel-card lsb-catalog-card"
-      aria-labelledby="lsb-catalog-title"
-    >
-      <header className="compact-card-heading">
-        <div className="inline-title">
-          <Hand size={17} aria-hidden="true" />
-          <h2 id="lsb-catalog-title">Catálogo LSB</h2>
-        </div>
-        <span className="demo-label">Módulo 1</span>
-      </header>
-
-      <p className="help-text lsb-catalog-intro">
-        {LSB_EXPRESSIONS.length} saludos documentados. Una coincidencia exacta
-        muestra aquí la expresión; el catálogo no traduce frases nuevas.
-      </p>
+  const body = (
+    <>
+      {embedded ? null : (
+        <p className="help-text lsb-catalog-intro">
+          {LSB_EXPRESSIONS.length} saludos documentados. Una coincidencia exacta
+          muestra aquí la expresión; el catálogo no traduce frases nuevas.
+        </p>
+      )}
 
       <form className="lsb-lookup" onSubmit={handleSubmit}>
         <label className="field-label" htmlFor="lsb-query">
@@ -290,6 +299,40 @@ export function LsbExpressionPanel({
           )}
         </div>
       ) : null}
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <div
+        className="lsb-catalog-embedded"
+        role="group"
+        aria-label="Catálogo LSB"
+      >
+        <p className="lsb-catalog-kicker">
+          <Hand size={13} aria-hidden="true" />
+          <span>
+            Catálogo LSB · {LSB_EXPRESSIONS.length} saludos documentados
+          </span>
+        </p>
+        {body}
+      </div>
+    );
+  }
+
+  return (
+    <section
+      className="panel-card lsb-catalog-card"
+      aria-labelledby="lsb-catalog-title"
+    >
+      <header className="compact-card-heading">
+        <div className="inline-title">
+          <Hand size={17} aria-hidden="true" />
+          <h2 id="lsb-catalog-title">Catálogo LSB</h2>
+        </div>
+        <span className="demo-label">Módulo 1</span>
+      </header>
+      {body}
     </section>
   );
 }

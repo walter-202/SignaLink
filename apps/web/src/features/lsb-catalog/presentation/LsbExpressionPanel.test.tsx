@@ -32,6 +32,21 @@ describe("LsbExpressionPanel", () => {
     expect(within(card).getByText("Disponible en este modelo")).toBeInTheDocument();
   });
 
+  it("renders embedded without its own card heading", () => {
+    render(<LsbExpressionPanel embedded draft="Hola" />);
+
+    expect(
+      screen.getByRole("group", { name: "Catálogo LSB" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Catálogo LSB" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/19 saludos documentados/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("article", { name: "Ficha de Hola" }),
+    ).toBeInTheDocument();
+  });
+
   it("explains that a phrase outside the catalog has no documented expression", async () => {
     const user = userEvent.setup();
     const onResolved = vi.fn();

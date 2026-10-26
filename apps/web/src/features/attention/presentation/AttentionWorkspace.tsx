@@ -191,16 +191,19 @@ export function AttentionWorkspace() {
         <aside className="attention-column attention-column--response" aria-label="Respuesta y datos del trámite">
           <ResponseComposer textareaRef={responseRef} />
           <div className="attention-support-grid">
-            <LsbExpressionPanel
-              draft={draft}
-              availableModelClips={availableModelClips}
-              onResolved={handleLsbResolution}
-            />
             <AvatarPreview
               expression={lsbExpression}
               isDraftMatch={Boolean(draftExpression)}
               autoStart={autoStartAvatar}
               onClipsLoaded={handleAvatarClipsLoaded}
+              catalog={
+                <LsbExpressionPanel
+                  embedded
+                  draft={draft}
+                  availableModelClips={availableModelClips}
+                  onResolved={handleLsbResolution}
+                />
+              }
             />
           </div>
           <div className="attention-session-grid">

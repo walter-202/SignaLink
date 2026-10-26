@@ -357,6 +357,10 @@ h1, h2, h3, p { margin-top: 0; }
   gap: 12px;
 }
 .attention-column { display: grid; min-width: 0; gap: 12px; }
+/* These wrappers only exist to group cards; the response grid places the cards directly. */
+.attention-support-grid, .attention-session-grid { display: contents; }
+.attention-column--response .composer-card { grid-column: 1 / -1; }
+.attention-column--response .avatar-preview-card { grid-column: 1 / -1; }
 .panel-card {
   min-width: 0;
   border: 1px solid var(--line);
@@ -665,6 +669,9 @@ h1, h2, h3, p { margin-top: 0; }
 .frequent-phrases button:hover, .frequent-phrases button:focus-visible { background: #edf8f8; }
 .composer-notice { margin: 0; color: #345e66; font-size: 0.66rem; line-height: 1.4; }
 .lsb-catalog-card { display: grid; gap: 6px; padding: 9px; }
+.lsb-catalog-embedded { display: grid; gap: 6px; }
+.lsb-catalog-kicker { display: flex; align-items: center; gap: 4px; margin: 0; color: var(--brand-strong); font-size: 0.62rem; font-weight: 680; line-height: 1.35; }
+.lsb-catalog-kicker > svg { flex: 0 0 auto; }
 .lsb-catalog-intro { line-height: 1.4; }
 .lsb-lookup { display: grid; gap: 4px; }
 .lsb-lookup .field-label { margin: 0; }
@@ -686,7 +693,7 @@ h1, h2, h3, p { margin-top: 0; }
 .lsb-source-details p { margin: 0.4rem 0 0; }
 .lsb-catalog-toggle { justify-self: start; border: 0; background: transparent; color: var(--brand); padding: 0.12rem 0; cursor: pointer; font-size: 0.63rem; font-weight: 650; text-align: left; }
 .lsb-catalog-toggle:hover, .lsb-catalog-toggle:focus-visible { text-decoration: underline; }
-.lsb-catalog-card .frequent-phrases button { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 0.35rem; }
+.lsb-catalog-card .frequent-phrases button, .lsb-catalog-embedded .frequent-phrases button { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 0.35rem; }
 .lsb-catalog-list { max-height: 260px; overflow-y: auto; }
 .lsb-catalog-row-title { display: grid; gap: 2px; }
 .lsb-catalog-row-title strong { color: var(--ink); font-size: 0.65rem; }
@@ -699,6 +706,9 @@ h1, h2, h3, p { margin-top: 0; }
 .send-response-button { min-height: 31px; padding-right: 0.6rem; padding-left: 0.6rem; }
 
 .avatar-preview-card { display: grid; gap: 6px; padding: 9px; }
+.avatar-preview-catalog { display: grid; gap: 6px; }
+.avatar-preview-action { display: grid; gap: 6px; }
+.avatar-preview-card--integrated .avatar-preview-action { border-top: 1px solid var(--line); padding-top: 8px; }
 .demo-label { display: inline-flex; border-radius: 99px; background: var(--info-soft); color: #1d4ed8; padding: 0.27rem 0.47rem; font-size: 0.59rem; font-weight: 730; white-space: nowrap; }
 .avatar-preview-viewport { position: relative; width: 100%; height: clamp(205px, 15vw, 220px); overflow: hidden; border-radius: 9px; background: #e9edef; }
 .avatar-preview-viewport > .avatar-canvas { position: absolute; inset: 0; }
@@ -871,9 +881,6 @@ h1, h2, h3, p { margin-top: 0; }
     align-content: start;
     gap: 10px;
   }
-  .attention-column--response .composer-card { grid-column: 1 / -1; }
-  .attention-column--response .lsb-catalog-card { grid-column: 1; }
-  .attention-column--response .avatar-preview-card { grid-column: 2; }
   .attention-column--response .procedure-info-card { grid-column: 1; }
   .attention-column--response .notes-card { grid-column: 2; }
   .attention-column--response .avatar-preview-viewport { height: clamp(180px, 18vh, 230px); }
