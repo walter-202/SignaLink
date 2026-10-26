@@ -72,7 +72,7 @@ export function parseRun(input, corpus) {
   const labelIds = array(run.model.labelIds, 256).map((id) => text(id)); unique(labelIds);
   object(run.pipeline, ["version", "codeRevision", "featureSchema", "preprocessorId", "inputShape", "frameIntervalMs", "confidenceThreshold", "minimumMargin", "landmarkModelSha256", "landmarkRuntime", "delegate", "classifierRuntime"]);
   for (const key of ["version", "featureSchema", "preprocessorId", "classifierRuntime"]) text(run.pipeline[key]);
-  oneOf(run.pipeline.landmarkRuntime, ["main-thread", "worker"]); oneOf(run.pipeline.delegate, ["CPU", "GPU"]);
+  oneOf(run.pipeline.landmarkRuntime, ["main-thread", "worker"]); oneOf(run.pipeline.delegate, ["CPU", "GPU", "unknown"]);
   text(run.pipeline.codeRevision, /^[a-f0-9]{40}$/); sha256(run.pipeline.landmarkModelSha256);
   const shape = array(run.pipeline.inputShape, 3);
   if (shape.length !== 3 || shape[0] !== 1 || shape.some((value) => !Number.isInteger(value))) fail();
@@ -80,7 +80,7 @@ export function parseRun(input, corpus) {
   number(run.pipeline.frameIntervalMs, 1, 1000);
   number(run.pipeline.confidenceThreshold, 0, 1); number(run.pipeline.minimumMargin, 0, 1);
   const declaredLabels = new Set(corpus.labels.map((label) => label.id));
-  if (labelIds.some((id) => !declaredLabels.has(id))) fail();
+  if (labelIds.some((id) => id !== "out-of-scope" && !declaredLabels.has(id))) fail();
   sha256(run.corpusSha256);
   if (run.datasetId !== corpus.datasetId || run.corpusSha256 !== corpusDigest(corpus) || run.evidence !== corpus.evidence) throw new EvaluationInputError("corpus-mismatch");
   const expected = new Map(corpus.clips.filter((clip) => clip.split === "test").map((clip) => [clip.id, clip]));
@@ -93,8 +93,10 @@ export function parseRun(input, corpus) {
     const clip = expected.get(result.clipId);
     if (!clip) throw new EvaluationInputError("sample-mismatch");
     oneOf(result.status, ["completed", "error"]);
-    number(result.observedUntilMs, 0, clip.durationMs);
-    if (result.status === "completed" && result.observedUntilMs !== clip.durationMs) fail();
+    number(result.observedUntilMs, 0, clip.durationMs + 5_000);
+    // A browser runner includes the actual post-playback inference/UI drain so
+    // late visible proposals stay in the ledger instead of being clipped away.
+    if (result.status === "completed" && (result.observedUntilMs < clip.durationMs || result.observedUntilMs > clip.durationMs + 5_000)) fail();
     let previous = -1;
     for (const proposal of array(result.proposals)) {
       object(proposal, ["labelId", "visibleAtMs"]);

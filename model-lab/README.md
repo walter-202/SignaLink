@@ -1,8 +1,9 @@
 # Model Lab: corpus y evaluación local
 
-Preparación y evaluación separadas de la PWA. Usan el Node ya instalado, sin
-paquetes, entornos, servidores o pesos adicionales. No leen videos ni ejecutan
-MediaPipe/ONNX. Las herramientas no certifican permisos o validez lingüística.
+Preparación y evaluación separadas de la PWA. La auditoría y el evaluador JSON
+usan Node sin paquetes. El runner opcional de navegador reproduce clips locales
+autorizados con MediaPipe y ONNX del proyecto; no sube video, landmarks ni
+conversaciones. Ninguna herramienta certifica permisos o validez lingüística.
 
 ## Probar los ejemplos
 
@@ -77,18 +78,18 @@ El auditor devuelve `corpusSha256`, hash del JSON canónico (claves de objetos
 ordenadas, arrays en su orden original). Cambiar anotaciones o particiones cambia
 la huella; no es el hash del video ni prueba de procedencia.
 
-Un futuro runner o anotación supervisada debe producir el registro mostrado en
-`examples/synthetic-run.json`, con una fila por **cada** clip de test:
+El runner de navegador produce el registro mostrado en `examples/synthetic-run.json`,
+con una fila por **cada** clip de test:
 
 | Campo | Significado |
 | --- | --- |
 | `datasetId`, `corpusSha256`, `split`, `evidence` | Coinciden exactamente con el corpus; `split: test` |
 | `runId`, `deviceProfileId`, `browserProfileId`, `condition` | Referencias privadas de ejecución/equipo/navegador; `cold` o `warm` |
 | `clock` | `realtime-clip-start-ms`: origen temporal al inicio real del clip a velocidad normal |
-| `model` | ID, versión, hash, `labelIds` admitidos y `trainingParticipantAudit` (`unknown`/`verified-disjoint`) |
-| `pipeline` | Versión, commit Git completo, esquema/preprocesador, dimensiones, intervalo/umbrales, hash de landmarks, modo real `main-thread`/`worker`, delegado `CPU`/`GPU` y runtime del clasificador |
+| `model` | ID, versión, hash, `labelIds` evaluables y `trainingParticipantAudit` (`unknown`/`verified-disjoint`); el reservado `out-of-scope` conserva salidas sin mapeo |
+| `pipeline` | Versión, commit Git completo, esquema/preprocesador, dimensiones, intervalo/umbrales, hash de landmarks, modo `main-thread`/`worker`, delegado `CPU`/`GPU`/`unknown` y runtime |
 | `results[].clipId`, `status` | Una fila única por clip; `completed` o `error`, sin stacks/mensajes privados |
-| `observedUntilMs` | Tiempo realmente observado; un caso completado exige la duración completa |
+| `observedUntilMs` | Tiempo observado, incluido hasta 5 s para drenar inferencia/render después del video |
 | `proposals` | Todas las propuestas visibles, en orden temporal estricto, con `labelId` y `visibleAtMs` |
 
 Una abstención es un caso completado con `proposals: []`. Un fallo temprano usa
@@ -96,13 +97,81 @@ Una abstención es un caso completado con `proposals: []`. Un fallo temprano usa
 visibles. No quitar errores, repeticiones o propuestas previas a la seña.
 
 Cada clip tiene una sola seña objetivo o es negativo completo. Debe incluir un
-margen posterior suficiente para observar respuestas: su fin es el límite de
-evaluación. No usar tiempos offline de tensores como tiempos de propuestas
-visibles. La herramienta valida los números declarados, no su reloj real.
+margen posterior suficiente para observar respuestas. El runner reproduce a
+velocidad 1× y registra la propuesta tras actualizar y pintar dos veces un campo
+editable. Reutiliza la política de aceptación y composición de texto de la cámara;
+el campo temporal no monta el componente React de una sesión, así que sus tiempos
+no representan el render completo de la app. No usar tiempos offline de tensores
+como tiempos de propuestas visibles. El evaluador valida números, no su reloj real.
 
 ```sh
 pnpm evaluate:recognition model-lab/datasets/private/corpus-v1.json model-lab/reports/private/run-v1.json
 ```
+
+## Runner de navegador
+
+El runner compara el detector de MediaPipe en el hilo de la interfaz con el
+Worker optativo usando el mismo ONNX LSB v4, el mismo modelo Holistic fijado y
+los mismos clips. Alterna cuál modo corre primero por clip, mantiene un video y
+un clasificador, y calienta ambos motores antes de medir. Los informes usan
+`condition: warm`; todavía no miden arranque en frío.
+
+1. Coloca el manifiesto en `model-lab/datasets/private/corpus-v1.json` y los clips
+   exactos de test en `model-lab/datasets/private/clips/`.
+2. Prepara el `.task` Holistic revisado con `pnpm --filter @la-voz/web prepare:holistic`
+   y copia la versión, el SHA-256 y los bytes que imprime.
+3. Copia `configs/browser-run.template.json` a
+   `model-lab/datasets/private/browser-run.json`. Mapea cada ID de clip a su
+   archivo local y cada clase del corpus a la etiqueta exacta del modelo. Las
+   etiquetas del modelo sin mapeo quedan como `out-of-scope` y cuentan como
+   errores o falsas alarmas.
+4. Ejecuta desde la raíz:
+
+   ```sh
+   pnpm run:recognition-browser -- model-lab/datasets/private/browser-run.json
+   ```
+
+Si ambas ejecuciones terminan correctamente, el mismo comando calcula la
+comparación emparejada y la guarda junto a los registros como
+`comparison-<baselineRunId>-<workerRunId>.json`. Los archivos se crean con
+permisos privados y nunca se sobrescriben. Antes de abrir el navegador verifica
+que esos IDs de salida estén libres. Si la comparación falla, conserva los
+registros de cada modo para revisión; corrige el manifiesto usando nuevos IDs
+antes de repetir la captura.
+
+El comando exige una carpeta Git limpia, corpus listo, SHA-256 coincidente de
+cada clip y un Holistic local verificado. Usa el Chromium y la configuración
+Playwright existentes; reutiliza el servidor Next en `127.0.0.1:3100`. Lee los
+clips bajo demanda, sin copiarlos. No captura trazas, videos ni screenshots. Los
+registros se escriben sin sobrescribir en `model-lab/reports/private/<runId>.json`,
+ignorado por Git.
+
+Las señas de test deben tener al menos 1 s antes del inicio anotado y 1,5 s
+después del fin. Cada clip debe ser MP4 o WebM y pesar como máximo 64 MiB. Un
+modelo o clip que no carga queda como fila `error`; el runner no elimina el caso.
+La consola no muestra rutas locales ni contenido de clips.
+
+El runner calcula las métricas de ambos registros. Los tiempos terminan
+después de pintar el campo editable del arnés, no del render React de
+`ConversationPanel`. Sirven para comparar motores bajo el mismo arnés; no bastan
+para afirmar una reducción del 50% en la app. Faltan el benchmark real en equipo
+objetivo, muestras suficientes y revisión lingüística.
+
+Para comparar registros ya existentes o volver a calcular un informe:
+
+```sh
+pnpm compare:recognition-runs \
+  model-lab/datasets/private/corpus-v1.json \
+  model-lab/reports/private/baseline-run.json \
+  model-lab/reports/private/worker-run.json
+```
+
+El comparador rechaza cambios en el corpus, modelo, preprocesamiento, versión de
+código, dispositivo, navegador, delegado o condición. Resume p50/p95 por brazo,
+ratios por muestra reconocida en ambos modos, macro F1 y falsas alarmas. Solo
+muestra estados de umbral para corpus `recorded`; en datos sintéticos los deja
+como `not-evaluated`. Aun con umbrales aprobados, `promotion` siempre queda
+`not-evaluated`: faltan tamaño de muestra, incertidumbre y validación lingüística.
 
 ## Interpretar métricas
 
@@ -139,8 +208,8 @@ Una partición local sin cruces no prueba generalización a personas nuevas para
 esos pesos. `unseenSignerClaimVerifiedByTool` permanece falso; una declaración
 externa de revisión tampoco es una comprobación de este programa.
 
-Faltan corpus y permisos reales, validación lingüística, runner navegador y
-comparación emparejada en el mismo equipo y condiciones. No se calculan WER/CER,
+Faltan corpus y permisos reales, validación lingüística, ejecución en equipo
+objetivo y comparación emparejada con suficientes muestras. No se calculan WER/CER,
 traducción, calibración, intervalos de confianza ni promoción automática.
 El protocolo propuesto está en `configs/public-service-benchmark.yaml`;
 sus criterios deben fijarse antes de observar resultados reales.

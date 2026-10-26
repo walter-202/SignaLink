@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "corpusPath": "corpus-v1.json",
+  "clipFiles": {
+    "opaque-test-clip-a": "clips/clip-a.mp4"
+  },
+  "modelLabelMap": {
+    "HOLA": "opaque-label-hola"
+  },
+  "deviceProfileId": "office-device-profile",
+  "browserProfileId": "chromium-desktop",
+  "holisticAsset": {
+    "version": "reviewed-v1",
+    "sha256": "replace-with-reviewed-sha256",
+    "bytes": 1
+  },
+  "runs": [
+    { "runId": "baseline-run-01", "landmarkRuntime": "main-thread", "condition": "warm" },
+    { "runId": "candidate-run-01", "landmarkRuntime": "worker", "condition": "warm" }
+  ]
+}

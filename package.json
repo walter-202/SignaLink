@@ -13,6 +13,8 @@
     "e2e:web": "pnpm --filter @la-voz/web test:e2e",
     "validate:corpus": "node model-lab/src/evaluation/cli.mjs audit",
     "evaluate:recognition": "node model-lab/src/evaluation/cli.mjs evaluate",
+    "compare:recognition-runs": "node model-lab/src/evaluation/compare-cli.mjs",
+    "run:recognition-browser": "node model-lab/src/browser/run.mjs",
     "test:model-lab": "node --test model-lab/tests/*.test.mjs"
   }
 }

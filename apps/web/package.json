@@ -13,7 +13,9 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:avatar-lab": "playwright test tests/e2e/avatar-lab.spec.ts --project=desktop-chromium --workers=1",
+    "test:model-lab:browser": "playwright test tests/e2e/model-lab-browser-runner.spec.ts --project=desktop-chromium --workers=1"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "1.1.1",

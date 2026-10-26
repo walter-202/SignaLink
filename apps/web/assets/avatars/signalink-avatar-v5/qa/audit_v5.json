@@ -1,0 +1,258 @@
+{
+  "file": "/mnt/data/signalink_avatar_v5_refined.glb",
+  "file_bytes": 6051776,
+  "nodes": 65,
+  "meshes": 20,
+  "mesh_nodes": 20,
+  "skinned_mesh_nodes": 9,
+  "rigid_mesh_nodes": 11,
+  "skins": 1,
+  "skin_joint_counts": [
+    43
+  ],
+  "morph_target_primitives": 1,
+  "root_node_children": {
+    "AvatarRoot": 10
+  },
+  "rigid_meshes_at_scene_root": [],
+  "skinned_details": [
+    {
+      "node": "Body_SkinnedJacketSleeves",
+      "vertices": 27758,
+      "single_influence_vertices": 9994,
+      "invalid_weight_sum_vertices": 0,
+      "maximum_joint_influences": 4,
+      "out_of_range_joints": 0,
+      "single_influence_percent": 36.0
+    },
+    {
+      "node": "Left_SkinnedLapelEdge",
+      "vertices": 8,
+      "single_influence_vertices": 0,
+      "invalid_weight_sum_vertices": 0,
+      "maximum_joint_influences": 2,
+      "out_of_range_joints": 0,
+      "single_influence_percent": 0.0
+    },
+    {
+      "node": "Right_SkinnedLapelEdge",
+      "vertices": 8,
+      "single_influence_vertices": 0,
+      "invalid_weight_sum_vertices": 0,
+      "maximum_joint_influences": 2,
+      "out_of_range_joints": 0,
+      "single_influence_percent": 0.0
+    },
+    {
+      "node": "Left_SkinnedHandMesh",
+      "vertices": 12868,
+      "single_influence_vertices": 5188,
+      "invalid_weight_sum_vertices": 0,
+      "maximum_joint_influences": 4,
+      "out_of_range_joints": 0,
+      "single_influence_percent": 40.32
+    },
+    {
+      "node": "Left_SkinnedCuff",
+      "vertices": 66,
+      "single_influence_vertices": 0,
+      "invalid_weight_sum_vertices": 0,
+      "maximum_joint_influences": 2,
+      "out_of_range_joints": 0,
+      "single_influence_percent": 0.0
+    },
+    {
+      "node": "Right_SkinnedHandMesh",
+      "vertices": 12868,
+      "single_influence_vertices": 5187,
+      "invalid_weight_sum_vertices": 0,
+      "maximum_joint_influences": 4,
+      "out_of_range_joints": 0,
+      "single_influence_percent": 40.31
+    },
+    {
+      "node": "Right_SkinnedCuff",
+      "vertices": 66,
+      "single_influence_vertices": 0,
+      "invalid_weight_sum_vertices": 0,
+      "maximum_joint_influences": 2,
+      "out_of_range_joints": 0,
+      "single_influence_percent": 0.0
+    },
+    {
+      "node": "Neck_SkinnedMesh",
+      "vertices": 162,
+      "single_influence_vertices": 0,
+      "invalid_weight_sum_vertices": 0,
+      "maximum_joint_influences": 3,
+      "out_of_range_joints": 0,
+      "single_influence_percent": 0.0
+    },
+    {
+      "node": "Head_SkinnedFace",
+      "vertices": 4753,
+      "single_influence_vertices": 4753,
+      "invalid_weight_sum_vertices": 0,
+      "maximum_joint_influences": 1,
+      "out_of_range_joints": 0,
+      "single_influence_percent": 100.0
+    }
+  ],
+  "animations": [
+    {
+      "name": "IDLE_BREATH",
+      "channels": 42,
+      "target_nodes": 42,
+      "root_animated": false,
+      "head_animated": true,
+      "torso_animated": true,
+      "shoulders_animated": true
+    },
+    {
+      "name": "DEMO_OPEN_HAND",
+      "channels": 42,
+      "target_nodes": 42,
+      "root_animated": false,
+      "head_animated": true,
+      "torso_animated": true,
+      "shoulders_animated": true
+    },
+    {
+      "name": "DEMO_FIST",
+      "channels": 42,
+      "target_nodes": 42,
+      "root_animated": false,
+      "head_animated": true,
+      "torso_animated": true,
+      "shoulders_animated": true
+    },
+    {
+      "name": "DEMO_POINT",
+      "channels": 42,
+      "target_nodes": 42,
+      "root_animated": false,
+      "head_animated": true,
+      "torso_animated": true,
+      "shoulders_animated": true
+    },
+    {
+      "name": "DEMO_PINCH",
+      "channels": 42,
+      "target_nodes": 42,
+      "root_animated": false,
+      "head_animated": true,
+      "torso_animated": true,
+      "shoulders_animated": true
+    },
+    {
+      "name": "DEMO_TWO_HANDS",
+      "channels": 42,
+      "target_nodes": 42,
+      "root_animated": false,
+      "head_animated": true,
+      "torso_animated": true,
+      "shoulders_animated": true
+    },
+    {
+      "name": "DEMO_WRIST_ROTATION",
+      "channels": 42,
+      "target_nodes": 42,
+      "root_animated": false,
+      "head_animated": true,
+      "torso_animated": true,
+      "shoulders_animated": true
+    },
+    {
+      "name": "DEMO_FINGER_SPREAD",
+      "channels": 42,
+      "target_nodes": 42,
+      "root_animated": false,
+      "head_animated": true,
+      "torso_animated": true,
+      "shoulders_animated": true
+    },
+    {
+      "name": "DEMO_FULL_BODY_TEST",
+      "channels": 42,
+      "target_nodes": 42,
+      "root_animated": false,
+      "head_animated": true,
+      "torso_animated": true,
+      "shoulders_animated": true
+    },
+    {
+      "name": "DEMO_SHOULDER_STRESS",
+      "channels": 42,
+      "target_nodes": 42,
+      "root_animated": false,
+      "head_animated": true,
+      "torso_animated": true,
+      "shoulders_animated": true
+    },
+    {
+      "name": "DEMO_HEAD_TURN",
+      "channels": 42,
+      "target_nodes": 42,
+      "root_animated": false,
+      "head_animated": true,
+      "torso_animated": true,
+      "shoulders_animated": true
+    },
+    {
+      "name": "DEMO_ELBOW_STRESS",
+      "channels": 42,
+      "target_nodes": 42,
+      "root_animated": false,
+      "head_animated": true,
+      "torso_animated": true,
+      "shoulders_animated": true
+    },
+    {
+      "name": "DEMO_WRIST_FLEX",
+      "channels": 42,
+      "target_nodes": 42,
+      "root_animated": false,
+      "head_animated": true,
+      "torso_animated": true,
+      "shoulders_animated": true
+    },
+    {
+      "name": "DEMO_BROW_LIFT",
+      "channels": 1,
+      "target_nodes": 1,
+      "root_animated": false,
+      "head_animated": true,
+      "torso_animated": false,
+      "shoulders_animated": false
+    },
+    {
+      "name": "DEMO_CHEEK_SMILE",
+      "channels": 1,
+      "target_nodes": 1,
+      "root_animated": false,
+      "head_animated": true,
+      "torso_animated": false,
+      "shoulders_animated": false
+    },
+    {
+      "name": "DEMO_EYE_BLINK",
+      "channels": 1,
+      "target_nodes": 1,
+      "root_animated": false,
+      "head_animated": true,
+      "torso_animated": false,
+      "shoulders_animated": false
+    },
+    {
+      "name": "DEMO_MOUTH_OPEN",
+      "channels": 1,
+      "target_nodes": 1,
+      "root_animated": false,
+      "head_animated": true,
+      "torso_animated": false,
+      "shoulders_animated": false
+    }
+  ],
+  "findings": [],
+  "release_gate": "REVIEW_REQUIRED"
+}

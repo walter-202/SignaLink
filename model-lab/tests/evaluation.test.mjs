@@ -83,6 +83,20 @@ test("requires an exact test ledger with the frozen corpus fingerprint", () => {
   assert.throws(() => evaluateRun(corpus, mismatch), /corpus-mismatch/);
 });
 
+test("keeps model outputs outside a task-specific corpus visible as false proposals", () => {
+  const corpus = corpusFixture(); const run = runFixture(corpus);
+  run.model.labelIds.push("out-of-scope");
+  run.results[0].proposals = [{ labelId: "out-of-scope", visibleAtMs: 1500 }];
+  run.results[4].proposals = [{ labelId: "out-of-scope", visibleAtMs: 1000 }];
+  run.results[4].observedUntilMs = 60_100;
+  run.results[5].observedUntilMs = 60_100;
+  const report = evaluateRun(corpus, run);
+  assert.equal(report.accuracySigns, 0.75);
+  assert.equal(report.counts.outOfScopeProposals, 2);
+  assert.equal(report.negativeExposure.falseAlarms, 1);
+  assert.equal(report.confusion.counts[0][report.confusion.columns.indexOf("$out-of-scope")], 1);
+});
+
 test("rejects malformed visible-event timing, incomplete completed rows and undeclared classes", () => {
   const corpus = corpusFixture();
   const cases = [
@@ -91,6 +105,7 @@ test("rejects malformed visible-event timing, incomplete completed rows and unde
     (run) => { run.results[0].proposals.push(run.results[0].proposals[0]); },
     (run) => { run.results[0].proposals[0].labelId = "unknown"; },
     (run) => { run.results[0].observedUntilMs = 2999; },
+    (run) => { run.results[0].observedUntilMs = 8001; },
     (run) => { run.results[0].message = "private-message"; },
     (run) => { run.pipeline.confidenceThreshold = NaN; },
     (run) => { run.pipeline.inputShape = [1, 30, 138, 1]; },

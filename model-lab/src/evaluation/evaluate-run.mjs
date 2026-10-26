@@ -17,13 +17,13 @@ export function evaluateRun(corpusInput, runInput) {
   if (audit.findings.some((finding) => blocked.has(finding.code))) throw new EvaluationInputError("corpus-not-ready");
   const labels = corpus.labels.map((label) => label.id);
   const rows = [...labels, "$background"];
-  const columns = [...labels, "$abstain", "$error", "$premature"];
+  const columns = [...labels, "$out-of-scope", "$abstain", "$error", "$premature"];
   const matrix = rows.map(() => columns.map(() => 0));
   const predictions = new Map(run.results.map((result) => [result.clipId, result]));
   const testClips = corpus.clips.filter((clip) => clip.split === "test");
   const classes = new Map(labels.map((id) => [id, { labelId: id, support: 0, truePositives: 0, falsePositives: 0, falseNegatives: 0 }]));
   const participants = new Map(); const latencies = [];
-  let signClips = 0; let correctSigns = 0; let abstentions = 0; let errors = 0; let extras = 0;
+  let signClips = 0; let correctSigns = 0; let abstentions = 0; let errors = 0; let extras = 0; let outOfScopeProposals = 0;
   let negativeClips = 0; let cleanNegatives = 0; let negativeExposureMs = 0; let falseAlarms = 0;
   let incompleteNegatives = 0; let prematureProposals = 0;
   for (const clip of testClips) {
@@ -31,8 +31,10 @@ export function evaluateRun(corpusInput, runInput) {
     const first = result.proposals[0];
     const group = participants.get(clip.participantId) ?? { signs: 0, correct: 0, abstained: 0, errors: 0 };
     extras += Math.max(0, result.proposals.length - 1);
+    outOfScopeProposals += result.proposals.filter((proposal) => !classes.has(proposal.labelId)).length;
     if (result.status === "error") errors++;
     let predicted = result.status === "error" ? "$error" : first?.labelId ?? "$abstain";
+    if (predicted !== "$error" && predicted !== "$abstain" && !classes.has(predicted)) predicted = "$out-of-scope";
     const truth = clip.kind === "sign" ? clip.labelId : "$background";
     if (clip.kind === "sign") {
       signClips++; group.signs++; classes.get(truth).support++;
@@ -73,7 +75,7 @@ export function evaluateRun(corpusInput, runInput) {
     pipeline: run.pipeline,
     metadataReady: audit.metadataReady, findings: audit.findings,
     promotion: "not-evaluated", latencyGoal50Percent: "not-evaluated", unseenSignerClaimVerifiedByTool: false,
-    counts: { clips: testClips.length, signClips, negativeClips, correctSigns, cleanNegatives, abstentions, errors, extraProposals: extras, prematureSignProposals: prematureProposals },
+    counts: { clips: testClips.length, signClips, negativeClips, correctSigns, cleanNegatives, abstentions, errors, extraProposals: extras, outOfScopeProposals, prematureSignProposals: prematureProposals },
     accuracySigns: ratio(correctSigns, signClips), accuracyAllClips: ratio(correctSigns + cleanNegatives, testClips.length),
     abstentionRateSigns: ratio(abstentions, signClips), errorRate: ratio(errors, testClips.length),
     macroF1: missingClasses.length ? null : macro, macroF1SupportedClasses: macro, missingTestClasses: missingClasses,

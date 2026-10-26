@@ -21,6 +21,9 @@ contenido validado.
 - El GLB pesa 20,540,968 bytes (20.5 MB) y se carga solo al pedir «Hola» en 3D.
   La imagen estática se mantiene como previsualización inicial; las otras
   expresiones no descargan ni reproducen el clip `HOLA`.
+- El prototipo V5 con 43 articulaciones y 17 clips de prueba está disponible en
+  `/avatar-lab` con un encuadre frontal adaptable. Permanece separado del flujo
+  de atención y no se mapea al catálogo LSB.
 - Los archivos `.glb` subidos se procesan como URL local del navegador y se
   limitan a 25 MB. `NEXT_PUBLIC_LSB_AVATAR_MODEL_URL=off` desactiva el GLB
   incluido; una ruta configurada se carga bajo demanda cuando hay un clip
@@ -39,6 +42,9 @@ contenido validado.
 - No hay clips para los otros 18 saludos. Si falta una animación exacta, el
   visor muestra el estado de no disponibilidad y nunca sustituye por `HOLA` ni
   por el primer clip del modelo.
+- La V5 es una prueba del rig; falta QA del validador oficial de Khronos, prueba
+  en móviles y revisión lingüística. Su auditor entregado queda en
+  `REVIEW_REQUIRED`.
 - La licencia CC0 del resultado se declara en la documentación de origen del
   asset. Antes de usarlo fuera del prototipo, conservar la atribución/procedencia
   y confirmar la licencia de todos los componentes incorporados.

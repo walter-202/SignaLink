@@ -1,0 +1,13 @@
+{
+  "id": "signalink-v5-refined",
+  "version": "5.0.0-prototype",
+  "filename": "signalink_avatar_v5_refined.glb",
+  "size_bytes": 6051776,
+  "sha256": "d188c1678608997e941795c9a09d8eeeae0a619c1710038841cc9a92fbf7ad29",
+  "bones": 43,
+  "skins": 1,
+  "technical_clips": 17,
+  "signed_content_validated": false,
+  "production_ready": false,
+  "notes": "Experimental prototype; four facial morph POSITION accessors include computed bounds for Three.js compatibility. Not a certified LSB motion model."
+}

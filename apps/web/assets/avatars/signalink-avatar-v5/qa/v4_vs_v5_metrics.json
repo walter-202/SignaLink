@@ -1,0 +1,58 @@
+{
+  "V4": {
+    "bytes": 4670592,
+    "sha256": "fc23f51bb01b97b1ca753e4840910e067eb46ce44eb415c4d9059670f371e220",
+    "skins": 1,
+    "joints": 43,
+    "clips": 13,
+    "meshes": 18,
+    "surface_checks": {
+      "Body_SkinnedJacketSleeves": {
+        "vertices": 18120,
+        "faces": 36236,
+        "watertight": true,
+        "max_weight_sum_error": 1.6e-07
+      },
+      "Left_SkinnedHandMesh": {
+        "vertices": 9618,
+        "faces": 19192,
+        "watertight": false,
+        "max_weight_sum_error": 1.6e-07
+      },
+      "Right_SkinnedHandMesh": {
+        "vertices": 9624,
+        "faces": 19204,
+        "watertight": false,
+        "max_weight_sum_error": 1.8e-07
+      }
+    }
+  },
+  "V5": {
+    "bytes": 6051776,
+    "sha256": "d188c1678608997e941795c9a09d8eeeae0a619c1710038841cc9a92fbf7ad29",
+    "skins": 1,
+    "joints": 43,
+    "clips": 17,
+    "meshes": 20,
+    "surface_checks": {
+      "Body_SkinnedJacketSleeves": {
+        "vertices": 27758,
+        "faces": 55512,
+        "watertight": true,
+        "max_weight_sum_error": 1.8e-07
+      },
+      "Left_SkinnedHandMesh": {
+        "vertices": 12868,
+        "faces": 25732,
+        "watertight": true,
+        "max_weight_sum_error": 1.6e-07
+      },
+      "Right_SkinnedHandMesh": {
+        "vertices": 12868,
+        "faces": 25732,
+        "watertight": true,
+        "max_weight_sum_error": 1.8e-07
+      }
+    }
+  }
+}

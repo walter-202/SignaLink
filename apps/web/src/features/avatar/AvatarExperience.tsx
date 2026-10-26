@@ -2,7 +2,6 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
-import { VoiceInputButton } from "@/features/communication";
 import SceneErrorBoundary from "./SceneErrorBoundary";
 
 const AvatarScene = dynamic(() => import("./AvatarScene"), {
@@ -11,12 +10,18 @@ const AvatarScene = dynamic(() => import("./AvatarScene"), {
 });
 
 const MAX_MODEL_SIZE = 25 * 1024 * 1024;
-const CONFIGURED_MODEL_URL = process.env.NEXT_PUBLIC_AVATAR_MODEL_URL || null;
+const V5_MODEL_URL = "/avatars/signalink_avatar_v5_refined.glb";
+const configuredModelUrl = process.env.NEXT_PUBLIC_AVATAR_MODEL_URL?.trim();
+const CONFIGURED_MODEL_URL = configuredModelUrl === "off"
+  ? null
+  : configuredModelUrl || V5_MODEL_URL;
 
 export default function AvatarExperience() {
   const [modelUrl, setModelUrl] = useState<string | null>(CONFIGURED_MODEL_URL);
   const [modelName, setModelName] = useState<string | null>(
-    CONFIGURED_MODEL_URL ? "Modelo del proyecto" : null,
+    CONFIGURED_MODEL_URL === V5_MODEL_URL
+      ? "SignaLink Avatar V5 · prototipo"
+      : CONFIGURED_MODEL_URL ? "Modelo configurado" : null,
   );
   const [clips, setClips] = useState<string[]>([]);
   const [selectedClip, setSelectedClip] = useState("");
@@ -24,18 +29,16 @@ export default function AvatarExperience() {
   const [isLooping, setIsLooping] = useState(true);
   const [speed, setSpeed] = useState(1);
   const [fileError, setFileError] = useState("");
-  const [spokenText, setSpokenText] = useState("");
   const objectUrlRef = useRef<string | null>(null);
+  const isBundledV5 = modelUrl === V5_MODEL_URL;
 
-  useEffect(() => {
-    return () => {
-      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-    };
+  useEffect(() => () => {
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
   }, []);
 
   const handleAnimationsLoaded = useCallback((names: string[]) => {
     setClips(names);
-    setSelectedClip((current) => (names.includes(current) ? current : names[0] ?? ""));
+    setSelectedClip((current) => names.includes(current) ? current : names[0] ?? "");
     setIsPlaying(false);
   }, []);
   const handlePlaybackEnded = useCallback(() => setIsPlaying(false), []);
@@ -77,21 +80,22 @@ export default function AvatarExperience() {
   }
 
   return (
-    <main className="avatar-page">
-      <header className="page-heading">
-        <p className="eyebrow">Prototipo interactivo</p>
-        <h1>Visor de avatar 3D</h1>
-        <p>
-          Explora un modelo, carga un archivo GLB desde este dispositivo y prueba
-          los clips incluidos en él. El archivo no se envía a ningún servidor.
-        </p>
+    <main className="avatar-page avatar-lab-page">
+      <header className="page-heading avatar-lab-heading">
+        <div>
+          <p className="eyebrow">Prototipo técnico · V5</p>
+          <h1>Laboratorio de avatar 3D</h1>
+          <p>Revisa el encuadre frontal, la malla y las animaciones del rig en el navegador.</p>
+        </div>
+        <span className="avatar-lab-status-badge">QA de rig · no LSB validado</span>
       </header>
 
-      <section className="avatar-workspace" aria-label="Visor y controles del avatar">
+      <section className="avatar-lab-layout" aria-label="Prueba técnica del avatar">
         <div
           className="avatar-viewer"
           role="region"
-          aria-label="Vista 3D del avatar. Usa mouse o pantalla táctil para girar y acercar."
+          aria-label="Vista frontal fija del avatar 3D"
+          data-testid="avatar-lab-viewer"
         >
           <SceneErrorBoundary key={modelUrl ?? "preview"}>
             <AvatarScene
@@ -100,15 +104,30 @@ export default function AvatarExperience() {
               isPlaying={isPlaying}
               isLooping={isLooping}
               speed={speed}
+              autoFrame
               onAnimationsLoaded={handleAnimationsLoaded}
               onPlaybackEnded={handlePlaybackEnded}
             />
           </SceneErrorBoundary>
-          <p className="viewer-hint">Arrastra para girar · rueda o pellizca para acercar</p>
+          <span className="avatar-viewer-label">
+            {isBundledV5 ? "V5 · rig glTF" : modelName ?? "Figura provisional"}
+          </span>
+          <p className="viewer-hint">Cámara fija de frente · sin rotación espacial</p>
         </div>
 
-        <aside className="avatar-controls" aria-labelledby="controls-title">
-          <h2 id="controls-title">Controles</h2>
+        <aside className="avatar-controls avatar-lab-controls" aria-labelledby="avatar-lab-controls-title">
+          <div className="avatar-lab-panel-heading">
+            <div>
+              <p className="eyebrow">Inspección local</p>
+              <h2 id="avatar-lab-controls-title">Controles del rig</h2>
+            </div>
+            <span className="avatar-lab-clip-count">{clips.length} clips</span>
+          </div>
+
+          <div className="avatar-lab-note" role="note">
+            <strong>Prototipo, no traductor</strong>
+            <p>Los clips son pruebas de cinemática. No representan señas LSB certificadas ni se conectan a la respuesta de Atención.</p>
+          </div>
 
           <div className="control-field">
             <label htmlFor="avatar-model">Modelo 3D (.glb)</label>
@@ -119,19 +138,19 @@ export default function AvatarExperience() {
               accept=".glb,model/gltf-binary"
               onChange={handleModelSelection}
             />
-            <p className="help-text">Máximo 25 MB. La vista inicial usa una figura provisional.</p>
+            <p className="help-text">Solo lectura local en el navegador. Máximo 25 MB.</p>
             {modelName ? <p className="model-name">Cargado: {modelName}</p> : null}
             {fileError ? <p className="status-message" role="alert">{fileError}</p> : null}
           </div>
 
-          {modelName ? (
-            <button className="secondary-button" type="button" onClick={clearModel}>
-              Volver a la figura provisional
+          {modelUrl ? (
+            <button className="secondary-button avatar-lab-reset" type="button" onClick={clearModel}>
+              Usar figura provisional
             </button>
           ) : null}
 
           <div className="control-field">
-            <label htmlFor="avatar-animation">Animación del modelo</label>
+            <label htmlFor="avatar-animation">Clip técnico</label>
             <select
               id="avatar-animation"
               value={selectedClip}
@@ -144,21 +163,17 @@ export default function AvatarExperience() {
               {clips.length === 0 ? <option value="">Sin clips disponibles</option> : null}
               {clips.map((clip) => <option key={clip} value={clip}>{clip}</option>)}
             </select>
-            <p className="help-text">
-              {modelUrl && clips.length === 0
-                ? "El GLB cargado no contiene clips de animación."
-                : "Los clips son recursos de prueba; aún requieren validación lingüística para representar LSB."}
-            </p>
+            <p className="help-text">La selección no confirma que el movimiento corresponda a una seña.</p>
           </div>
 
-          <div className="control-row">
+          <div className="avatar-lab-playback">
             <button
               className="primary-button"
               type="button"
               disabled={!selectedClip}
               onClick={() => setIsPlaying((playing) => !playing)}
             >
-              {isPlaying ? "Pausar" : "Reproducir"}
+              {isPlaying ? "Pausar clip" : "Reproducir clip"}
             </button>
             <button
               className="secondary-button"
@@ -170,17 +185,17 @@ export default function AvatarExperience() {
             </button>
           </div>
 
-          <label className="toggle-row">
+          <label className="toggle-row avatar-lab-toggle">
             <input
               type="checkbox"
               checked={isLooping}
               disabled={!selectedClip}
               onChange={(event) => setIsLooping(event.currentTarget.checked)}
             />
-            Repetir animación
+            Repetir clip
           </label>
 
-          <div className="control-field">
+          <div className="control-field avatar-lab-speed">
             <label htmlFor="avatar-speed">Velocidad: {speed.toFixed(1)}×</label>
             <input
               className="range-control"
@@ -194,44 +209,17 @@ export default function AvatarExperience() {
               onChange={(event) => setSpeed(Number(event.currentTarget.value))}
             />
           </div>
+
+          {isBundledV5 ? (
+            <dl className="avatar-lab-facts" aria-label="Ficha del modelo V5">
+              <div><dt>Rig</dt><dd>43 articulaciones · 1 skin</dd></div>
+              <div><dt>Clips técnicos</dt><dd>17</dd></div>
+              <div><dt>Archivo</dt><dd>6.05 MB</dd></div>
+              <div><dt>Estado</dt><dd>Revisión requerida</dd></div>
+            </dl>
+          ) : null}
         </aside>
       </section>
-
-      <section className="voice-card" aria-labelledby="voice-title">
-        <div className="voice-heading">
-          <div>
-            <p className="eyebrow">Entrada experimental</p>
-            <h2 id="voice-title">Dictado en español</h2>
-          </div>
-          <p className="help-text">
-            El dictado convierte voz en texto para preparar una futura traducción.
-            Aún no genera señas ni controla las animaciones del avatar.
-          </p>
-        </div>
-        <VoiceInputButton onTranscriptComplete={setSpokenText} />
-        <div className="control-field">
-          <label htmlFor="spoken-text">Texto reconocido</label>
-          <textarea
-            className="text-input"
-            id="spoken-text"
-            rows={4}
-            value={spokenText}
-            onChange={(event) => setSpokenText(event.currentTarget.value)}
-            placeholder="Aquí aparecerá el texto dictado; también puedes escribirlo."
-          />
-        </div>
-        <p className="help-text">
-          El navegador puede procesar el audio mediante sus propios servicios.
-          Revisa sus permisos y privacidad antes de dictar información sensible.
-        </p>
-      </section>
-
-      <div className="notice-card" role="note">
-        <strong>Estado del prototipo:</strong> la figura inicial es geométrica y
-        solo sirve para probar el visor. Para usar un avatar riggeado, selecciona
-        un GLB autorizado con sus clips de animación. El visor no traduce español
-        ni certifica que una animación corresponda a una seña LSB.
-      </div>
     </main>
   );
 }

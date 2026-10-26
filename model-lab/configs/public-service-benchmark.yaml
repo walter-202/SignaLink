@@ -1,6 +1,5 @@
-# Protocolo preparatorio. No lo consume el comparador de JSON ni existe aún
-# un runner de inferencia con corpus real. El evaluador de registros JSON v1 ya
-# existe; los criterios deben acordarse antes de evaluar datos reales.
+# Protocolo preparatorio. El auditor, evaluador JSON y runner de navegador están
+# disponibles; faltan corpus, permisos, artefactos revisados y ejecución piloto.
 protocol_version: 1
 status: awaiting_authorized_artifacts_and_corpus
 language: LSB
@@ -51,4 +50,7 @@ tooling:
   run_ledger_schema_version: 1
   audit_command: pnpm validate:corpus
   ledger_evaluation_command: pnpm evaluate:recognition
-  browser_inference_runner: not_implemented
+  paired_comparison_command: pnpm compare:recognition-runs
+  browser_inference_runner: implemented_requires_authorized_local_assets
+  browser_runner_writes_paired_comparison: true
+  automatic_promotion: disabled

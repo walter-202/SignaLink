@@ -27,6 +27,7 @@ import { useRecognitionModel, useLandmarkRuntime, type LandmarkRuntimeMode } fro
 import { BrowserResponsivenessMonitor } from "@/features/sign-recognition/infrastructure/browser-responsiveness-monitor";
 import { ContinuousRecognitionPipeline } from "@/features/sign-recognition/application/continuous-recognition-pipeline";
 import { RecognitionPerformance } from "@/features/sign-recognition/application/recognition-performance";
+import { decideModelCapture, type AcceptedCaptureLabel } from "@/features/sign-recognition/application/model-capture-policy";
 import { RecognitionDiagnostics } from "@/features/sign-recognition/presentation/components/RecognitionDiagnostics";
 import type { SignClassifier } from "@/features/sign-recognition/application/ports/sign-classifier";
 
@@ -55,7 +56,7 @@ export function CameraPanel({ camera }: CameraPanelProps) {
   const classifierRef = useRef<SignClassifier | null>(null);
   const pipelineRef = useRef<ContinuousRecognitionPipeline | null>(null);
   const [metrics] = useState(() => new RecognitionPerformance());
-  const lastAcceptedRef = useRef<{ label: string; at: number } | null>(null);
+  const lastAcceptedRef = useRef<AcceptedCaptureLabel | null>(null);
   const lastProgressRef = useRef(0);
   const previousContinuousRef = useRef(false);
   const preserveCaptureErrorRef = useRef(false);
@@ -161,27 +162,27 @@ export function CameraPanel({ camera }: CameraPanelProps) {
             onProcessing: setCaptureProcessing,
             onPrediction: (prediction) => {
               if (!useAttentionStore.getState().continuousCapture) return;
-              if (prediction.modelId !== manifest.id || prediction.modelVersion !== manifest.version) {
+              const now = performance.now();
+              const decision = decideModelCapture(prediction, manifest, lastAcceptedRef.current, now, duplicateLabelWindowMs);
+              if (decision.kind === "model-mismatch") {
                 preserveCaptureErrorRef.current = true;
                 pipelineRef.current?.stop();
                 stopContinuousCapture();
                 setModelCaptureError("La predicción pertenece a otro modelo. Vuelve a iniciar el reconocimiento.");
                 return;
               }
-              if (!Number.isFinite(prediction.confidence) || prediction.decision !== "candidate" || prediction.label.length === 0) {
+              if (decision.kind === "uncertain") {
                 metrics.increment("uncertain");
                 resumeContinuousCapture();
                 setModelCaptureError(`No se reconoció una etiqueta por encima del umbral de ${Math.round(manifest.confidenceThreshold * 100)}% y el margen mínimo del modelo (puntuación ${Number.isFinite(prediction.confidence) ? `${(prediction.confidence * 100).toFixed(1)}%` : "no válida"}). Repite la seña con manos y torso visibles.`);
                 return;
               }
-              const now = performance.now();
-              const previous = lastAcceptedRef.current;
-              if (previous && previous.label === prediction.label && now - previous.at < duplicateLabelWindowMs) {
+              if (decision.kind === "duplicate") {
                 metrics.increment("duplicates");
                 resumeContinuousCapture();
                 return;
               }
-              lastAcceptedRef.current = { label: prediction.label, at: now };
+              lastAcceptedRef.current = decision.next;
               metrics.increment("accepted");
               setModelCaptureError(null);
               appendModelCapture(prediction.label, prediction.confidence);
