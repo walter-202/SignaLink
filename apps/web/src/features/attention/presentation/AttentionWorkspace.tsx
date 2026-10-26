@@ -50,12 +50,13 @@ export function AttentionWorkspace() {
   const draftResolution = resolveLsbExpression(draft);
   const draftExpression =
     draftResolution.status === "matched" ? draftResolution.expression : null;
-  const manualExpression =
+  const manualSelection =
     lsbSelection &&
     (lsbSelection.sourceDraft === null ||
       normalizeSpanish(lsbSelection.sourceDraft) === normalizeSpanish(draft))
-      ? lsbSelection.expression
+      ? lsbSelection
       : null;
+  const manualExpression = manualSelection?.expression ?? null;
   const lsbExpression = draftExpression ?? manualExpression;
   const notes = useAttentionStore((state) => state.notes);
   const notesError = useAttentionStore((state) => state.notesError);
@@ -202,6 +203,17 @@ export function AttentionWorkspace() {
                   draft={draft}
                   availableModelClips={availableModelClips}
                   onResolved={handleLsbResolution}
+                  selection={manualSelection}
+                />
+              }
+              dialogCatalog={
+                <LsbExpressionPanel
+                  embedded
+                  defaultCatalogOpen
+                  draft={draft}
+                  availableModelClips={availableModelClips}
+                  onResolved={handleLsbResolution}
+                  selection={manualSelection}
                 />
               }
             />

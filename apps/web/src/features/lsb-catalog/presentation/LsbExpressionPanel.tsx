@@ -76,6 +76,7 @@ export function LsbExpressionPanel({
   const uid = useId();
   const queryInputId = `${uid}-query`;
   const listId = `${uid}-list`;
+  const titleId = `${uid}-title`;
   const [query, setQuery] = useState("");
   const [resolution, setResolution] = useState<LsbResolution | null>(null);
   const [resolutionDraft, setResolutionDraft] = useState<string | null>(null);
@@ -99,6 +100,17 @@ export function LsbExpressionPanel({
     hasDraftMatch &&
     resolution?.status === "matched" &&
     resolution.expression.id !== draftResolution.expression.id;
+
+  useEffect(() => {
+    if (!selection) return;
+    setQuery(selection.expression.spanish);
+    setResolution({
+      status: "matched",
+      normalizedInput: normalizeSpanish(selection.expression.spanish),
+      expression: selection.expression,
+    });
+    setResolutionDraft(selection.sourceDraft ?? draft);
+  }, [draft, selection]);
 
   function resolve(value: string, sourceDraft = draft) {
     const next = resolveLsbExpression(value);
@@ -140,13 +152,13 @@ export function LsbExpressionPanel({
       )}
 
       <form className="lsb-lookup" onSubmit={handleSubmit}>
-        <label className="field-label" htmlFor="lsb-query">
+        <label className="field-label" htmlFor={queryInputId}>
           Buscar expresión
         </label>
         <div className="search-field">
           <Search size={15} aria-hidden="true" />
           <input
-            id="lsb-query"
+            id={queryInputId}
             value={query}
             onChange={(event) => {
               setQuery(event.currentTarget.value);
@@ -248,7 +260,7 @@ export function LsbExpressionPanel({
         className="lsb-catalog-toggle"
         type="button"
         aria-expanded={listVisible}
-        aria-controls="lsb-catalog-list"
+        aria-controls={listId}
         onClick={() => setCatalogOpen((open) => !open)}
       >
         {listVisible
@@ -270,7 +282,7 @@ export function LsbExpressionPanel({
       {listVisible ? (
         <div
           className="frequent-phrases lsb-catalog-list"
-          id="lsb-catalog-list"
+          id={listId}
           aria-label="Expresiones documentadas"
         >
           {matches.length === 0 ? (
@@ -334,12 +346,12 @@ export function LsbExpressionPanel({
   return (
     <section
       className="panel-card lsb-catalog-card"
-      aria-labelledby="lsb-catalog-title"
+      aria-labelledby={titleId}
     >
       <header className="compact-card-heading">
         <div className="inline-title">
           <Hand size={17} aria-hidden="true" />
-          <h2 id="lsb-catalog-title">Catálogo LSB</h2>
+          <h2 id={titleId}>Catálogo LSB</h2>
         </div>
         <span className="demo-label">Módulo 1</span>
       </header>

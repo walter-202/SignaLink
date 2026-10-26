@@ -1,6 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { LSB_EXPRESSIONS } from "../domain/lsb-catalog";
 import { LsbExpressionPanel } from "./LsbExpressionPanel";
 
 describe("LsbExpressionPanel", () => {
@@ -56,6 +57,44 @@ describe("LsbExpressionPanel", () => {
     expect(
       screen.getByRole("article", { name: "Ficha de Hola" }),
     ).toBeInTheDocument();
+  });
+
+  it("uses unique field ids when rendered more than once", () => {
+    render(
+      <>
+        <LsbExpressionPanel draft="" />
+        <LsbExpressionPanel embedded defaultCatalogOpen draft="" />
+      </>,
+    );
+
+    const [first, second] = screen.getAllByRole("textbox", {
+      name: "Buscar expresión",
+    });
+    expect(first.id).not.toBe(second.id);
+  });
+
+  it("shows a shared selection coming from another catalog instance", () => {
+    const gracias = LSB_EXPRESSIONS.find((item) => item.spanish === "Gracias");
+    if (!gracias) throw new Error("El catálogo debe incluir «Gracias».");
+
+    const { rerender } = render(<LsbExpressionPanel draft="Necesito ayuda" />);
+    expect(
+      screen.queryByRole("article", { name: "Ficha de Gracias" }),
+    ).not.toBeInTheDocument();
+
+    rerender(
+      <LsbExpressionPanel
+        draft="Necesito ayuda"
+        selection={{ expression: gracias, sourceDraft: "Necesito ayuda" }}
+      />,
+    );
+
+    expect(
+      screen.getByRole("article", { name: "Ficha de Gracias" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "Buscar expresión" }),
+    ).toHaveValue("Gracias");
   });
 
   it("explains that a phrase outside the catalog has no documented expression", async () => {

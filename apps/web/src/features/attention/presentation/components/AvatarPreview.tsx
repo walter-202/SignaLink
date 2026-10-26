@@ -40,6 +40,8 @@ interface AvatarPreviewProps {
    * its own summary because the catalog already names the selected expression.
    */
   catalog?: ReactNode;
+  /** Catalog rendered inside the 3D dialog so expressions can be changed there. */
+  dialogCatalog?: ReactNode;
 }
 
 function formatTime(value: number): string {
@@ -56,6 +58,7 @@ export function AvatarPreview({
   autoStart = false,
   onClipsLoaded,
   catalog,
+  dialogCatalog,
 }: AvatarPreviewProps = {}) {
   const [modelUrl, setModelUrl] = useState<string | null>(null);
   const [modelName, setModelName] = useState("");
@@ -247,6 +250,13 @@ export function AvatarPreview({
     setDialogOpen(true);
   }, [autoStart, canLoadConfiguredModel, expression?.id, loadConfiguredModel]);
 
+  useEffect(() => {
+    if (!dialogOpen || !canLoadConfiguredModel || hasModel || activeModelError) {
+      return;
+    }
+    loadConfiguredModel();
+  }, [activeModelError, canLoadConfiguredModel, dialogOpen, hasModel, loadConfiguredModel]);
+
   let statusMessage =
     "Escribe una expresión exacta del catálogo o selecciónala para revisar su clip.";
   if (activeModelError) {
@@ -368,11 +378,12 @@ export function AvatarPreview({
               "«" +
               expression.spanish +
               "». El clip solo se reproduce si el modelo lo contiene."
-            : "Vista de clips de demostración disponibles en el modelo seleccionado."
+            : "Selecciona una expresión del catálogo para revisar su clip."
         }
         className="avatar-dialog-content"
       >
-        <div className="avatar-modal-content">
+        <div className="avatar-modal-layout">
+          <div className="avatar-modal-content">
           <div
             className="avatar-preview-viewport avatar-modal-scene"
             ref={sceneRef}
@@ -503,6 +514,12 @@ export function AvatarPreview({
           ) : null}
           {hasModel && clips.length === 0 && clipsLoaded ? (
             <p className="help-text">El GLB cargó, pero no contiene animaciones.</p>
+          ) : null}
+          </div>
+          {dialogCatalog ? (
+            <aside className="avatar-modal-catalog" aria-label="Catálogo LSB">
+              {dialogCatalog}
+            </aside>
           ) : null}
         </div>
       </Dialog>

@@ -719,8 +719,10 @@ h1, h2, h3, p { margin-top: 0; }
 .avatar-summary-copy strong { overflow: hidden; color: var(--ink); font-size: 0.78rem; text-overflow: ellipsis; white-space: nowrap; }
 .avatar-summary-copy > span:last-child { color: var(--muted); font-size: 0.63rem; line-height: 1.4; }
 .dialog-content.avatar-dialog-content { width: min(92vw, 1120px); max-height: min(94vh, 900px); padding: 20px; }
+.avatar-modal-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(250px, 310px); align-items: start; gap: 12px; }
+.avatar-modal-catalog { display: grid; max-height: min(74vh, 720px); overflow-y: auto; border: 1px solid var(--line); border-radius: 9px; background: #fff; padding: 9px; }
 .avatar-dialog-content .dialog-description { max-width: 720px; }
-.avatar-modal-content { display: grid; gap: 10px; }
+.avatar-modal-content { display: grid; gap: 10px; min-width: 0; }
 .avatar-modal-scene { height: clamp(330px, 64vh, 620px); min-height: 330px; background: #e8f2ef; }
 .avatar-scene-empty { position: absolute; inset: 0; display: grid; align-content: center; justify-items: center; gap: 10px; padding: 24px; text-align: center; }
 .avatar-scene-empty strong { color: var(--ink); font-size: 0.95rem; }
@@ -1020,6 +1022,8 @@ h1, h2, h3, p { margin-top: 0; }
   .camera-viewport { height: 300px; }
   .avatar-preview-viewport { height: 230px; }
   .dialog-content.avatar-dialog-content { width: min(96vw, 760px); max-height: 94dvh; padding: 13px; }
+  .avatar-modal-layout { grid-template-columns: minmax(0, 1fr); }
+  .avatar-modal-catalog { max-height: none; }
   .avatar-modal-scene { height: min(56dvh, 500px); min-height: 260px; }
   .avatar-modal-toolbar { align-items: flex-start; flex-direction: column; }
   .avatar-modal-actions { width: 100%; justify-content: space-between; }

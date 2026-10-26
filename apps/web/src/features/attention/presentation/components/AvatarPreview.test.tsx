@@ -227,6 +227,48 @@ describe("AvatarPreview", () => {
     ).toBeDisabled();
   });
 
+  it("shows the catalog inside the 3D dialog", async () => {
+    const { AvatarPreview } = await import("./AvatarPreview");
+    render(
+      <AvatarPreview
+        expression={expression()}
+        dialogCatalog={<div>Catálogo en el diálogo</div>}
+      />,
+    );
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Abrir escena 3D" }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Vista 3D de respuesta",
+    });
+    expect(
+      within(dialog).getByText("Catálogo en el diálogo"),
+    ).toBeInTheDocument();
+  });
+
+  it("loads the model when a selection is made inside the dialog", async () => {
+    const { AvatarPreview } = await import("./AvatarPreview");
+    const catalog = <div>Catálogo en el diálogo</div>;
+    const { rerender } = render(<AvatarPreview dialogCatalog={catalog} />);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Abrir escena 3D" }),
+    );
+    await screen.findByRole("dialog", { name: "Vista 3D de respuesta" });
+    expect(screen.queryByTestId("scene")).not.toBeInTheDocument();
+
+    rerender(<AvatarPreview expression={expression()} dialogCatalog={catalog} />);
+
+    await screen.findByTestId("scene");
+    await waitFor(() =>
+      expect(screen.getByTestId("scene")).toHaveAttribute(
+        "data-animation",
+        "Armature|HOLA",
+      ),
+    );
+  });
+
   it("integrates the catalog in the card without repeating the summary", async () => {
     const { AvatarPreview } = await import("./AvatarPreview");
     render(<AvatarPreview catalog={<div>Catálogo dentro de la vista</div>} />);
