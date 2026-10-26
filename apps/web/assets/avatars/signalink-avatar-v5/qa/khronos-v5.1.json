@@ -2,11 +2,11 @@
   "uri": "signalink_avatar_v5_refined.glb",
   "mimeType": "model/gltf-binary",
   "validatorVersion": "2.0.0-dev.3.10",
-  "validatedAt": "2026-10-26T20:46:21.498Z",
+  "validatedAt": "2026-10-26T21:17:02.707Z",
   "issues": {
     "numErrors": 0,
     "numWarnings": 0,
-    "numInfos": 3,
+    "numInfos": 2,
     "numHints": 0,
     "messages": [
       {
@@ -20,12 +20,6 @@
         "message": "This object may be unused.",
         "severity": 2,
         "pointer": "/materials/4"
-      },
-      {
-        "code": "UNUSED_OBJECT",
-        "message": "This object may be unused.",
-        "severity": 2,
-        "pointer": "/materials/5"
       }
     ],
     "truncated": false

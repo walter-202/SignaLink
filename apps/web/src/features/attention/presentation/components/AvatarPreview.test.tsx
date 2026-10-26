@@ -1,12 +1,13 @@
+import { useState } from "react";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LsbExpression } from "@/features/lsb-catalog/domain/lsb-expression";
 
 const scene = vi.hoisted(() => ({
-  clips: ["Armature|HOLA", "Armature|GRACIAS"],
+  clips: ["Armature|HOLA", "Armature|GRACIAS", "QA_DACTILO_A", "QA_DACTILO_B", "QA_DACTILO_L"],
   // Three.js reports clip durations in seconds.
-  durations: { "Armature|HOLA": 2.4, "Armature|GRACIAS": 1.8 },
+  durations: { "Armature|HOLA": 2.4, "Armature|GRACIAS": 1.8, QA_DACTILO_A: 2.2, QA_DACTILO_B: 2.2, QA_DACTILO_L: 2.2 },
 }));
 
 vi.mock("@/features/avatar/AvatarScene", async () => {
@@ -81,6 +82,41 @@ afterEach(() => {
 });
 
 describe("AvatarPreview", () => {
+  it("returns from an alphabet study to the shared greeting selection", async () => {
+    const user = userEvent.setup();
+    const { AvatarPreview } = await import("./AvatarPreview");
+    function Harness() {
+      const [value, setValue] = useState(expression());
+      return <AvatarPreview expression={value} dialogCatalog={<button onClick={() => setValue(expression({ id: "chau", spanish: "Chau", animationClipId: "CHAU", animationStatus: "unavailable" }))}>Elegir Chau</button>} />;
+    }
+    render(<Harness />);
+    await user.click(screen.getByRole("button", { name: "Abrir escena 3D" }));
+    const dialog = await screen.findByRole("dialog", { name: "Vista 3D de respuesta" });
+    await screen.findByTestId("scene");
+    await user.click(within(dialog).getByRole("button", { name: /A Estudio dactilológico/ }));
+    await waitFor(() => expect(screen.getByTestId("scene")).toHaveAttribute("data-animation", "QA_DACTILO_A"));
+    await user.click(within(dialog).getByRole("button", { name: "Elegir Chau" }));
+    await waitFor(() => expect(screen.getByTestId("scene")).toHaveAttribute("data-animation", ""));
+    expect(within(dialog).getByText(/no incluye el clip «CHAU»/)).toBeInTheDocument();
+  });
+
+  it("plays an alphabet study in the dialog without treating it as a response", async () => {
+    const user = userEvent.setup();
+    await renderPreview(expression());
+    await user.click(screen.getByRole("button", { name: "Abrir escena 3D" }));
+    const dialog = await screen.findByRole("dialog", { name: "Vista 3D de respuesta" });
+    await screen.findByTestId("scene");
+    await user.click(within(dialog).getByRole("button", { name: "Dactilología" }));
+    await user.click(within(dialog).getByRole("button", { name: /A Estudio dactilológico/ }));
+    await waitFor(() => expect(screen.getByTestId("scene")).toHaveAttribute("data-animation", "QA_DACTILO_A"));
+    expect(within(dialog).getByText(/A: clip provisional disponible/)).toBeInTheDocument();
+    expect(screen.getByText("«Hola»")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Saludos" }));
+    await user.click(within(dialog).getByRole("button", { name: /Chau Saludo documentado/ }));
+    await waitFor(() => expect(screen.getByTestId("scene")).toHaveAttribute("data-animation", ""));
+    expect(within(dialog).getByText(/Chau: no hay clip disponible/)).toBeInTheDocument();
+  });
+
   it("plays only the exact mapped clip and shows its real duration", async () => {
     vi.stubEnv(
       "NEXT_PUBLIC_LSB_AVATAR_MODEL_URL",

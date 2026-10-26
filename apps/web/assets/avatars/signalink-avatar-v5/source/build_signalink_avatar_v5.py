@@ -336,7 +336,7 @@ def build(out,res=.0095):
         along=(np.asarray(cuff_mesh.vertices)-w)@direction
         t=smoothstep((along+.047)/.042)
         cji,cjw=weight_packed([(idcs[side+'LowerArm'],1-t),(idcs[side+'Hand'],t)],total)
-        mi=g.mesh_weighted(side+'_Cuff',cuff_mesh,mat_jacket,cji,cjw)
+        mi=g.mesh_weighted(side+'_Cuff',cuff_mesh,mat_cuff,cji,cjw)
         g.node(side+'_SkinnedCuff',parent=root,mesh=mi,skin=skin_i)
 
     # Neck skinned from chest -> neck -> head. Face, hair and eyes share head control.

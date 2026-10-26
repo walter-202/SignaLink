@@ -69,7 +69,7 @@ export default function GltfAvatar({
     camera.fov = 32;
     const halfFovTangent = Math.tan(MathUtils.degToRad(camera.fov / 2));
     const aspect = size.width / size.height;
-    const fill = 0.78;
+    const fill = 0.83;
     const verticalDistance = dimensions.y / (2 * halfFovTangent * fill);
     const horizontalDistance = dimensions.x / (2 * halfFovTangent * aspect * fill);
     const distance = Math.max(verticalDistance, horizontalDistance) + dimensions.z / 2;

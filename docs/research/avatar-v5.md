@@ -2,7 +2,7 @@
 
 El archivo `signalink_avatar_v5_refined.glb` ahora es la revisión V5.1:
 6,975,884 bytes, SHA-256
-`5af2f0961479c037bc9cd34c9abd01b45e23e883d4c23fc97dc8f7ed883da8b3`.
+`af0830c672b2640c90955ba4c7f11dd0f19c063e4eac605914d2180faca3e621`.
 Conserva un skin y 43 articulaciones; contiene 17 pruebas técnicas y `HOLA`
 provisional adaptado desde el avatar propio anterior.
 
@@ -24,7 +24,7 @@ provisional adaptado desde el avatar propio anterior.
 ## Evidencia
 
 `qa/khronos-v5.1.json`: validador oficial Khronos glTF Validator,
-0 errores, 0 advertencias y 3 avisos informativos por materiales sin uso.
+0 errores, 0 advertencias y 2 avisos informativos por materiales sin uso.
 `qa/deformation-v5.1.json`: 189 poses muestreadas en 21 clips, coordenadas
 finitas/acotadas; cabeza y ambas manos cerradas y de winding consistente.
 Esta prueba CPU evalúa skinning, no las deformaciones de morph targets.
@@ -104,3 +104,13 @@ hacia la palma; las posturas siguen siendo aproximaciones pendientes de revisió
 El catálogo permite abrir cada estudio A, B o L en una pestaña independiente
 y el laboratorio selecciona únicamente identificadores de esa lista permitida.
 La sesión de atención queda abierta.
+
+## Selector de clips en Atención
+
+La escena incluye un catálogo con saludos y las tres posturas dactilológicas
+provisionales. El selector busca por categoría y reproduce únicamente los
+identificadores presentes en el GLB; las expresiones sin clip indican su
+indisponibilidad. Explorar la escena no altera el borrador de la respuesta.
+Se aclararon los puños del rig para acercarlos a la referencia visual.
+Las posturas siguen pendientes de revisión lingüística y no se usan para
+formar palabras de manera automática.

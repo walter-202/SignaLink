@@ -16,6 +16,7 @@ import { Dialog } from "@/components/ui/Dialog";
 import SceneErrorBoundary from "@/features/avatar/SceneErrorBoundary";
 import { resolveAnimationClip } from "@/features/lsb-catalog/application/resolve-animation";
 import type { LsbExpression } from "@/features/lsb-catalog/domain/lsb-expression";
+import { AvatarClipCatalog, type AvatarCatalogSelection } from "./AvatarClipCatalog";
 
 const MAX_MODEL_SIZE = 25 * 1024 * 1024;
 const BUNDLED_AVATAR_URL = "/avatars/signalink_avatar_v5_refined.glb";
@@ -71,6 +72,7 @@ export function AvatarPreview({
   const [restartToken, setRestartToken] = useState(0);
   const [fileError, setFileError] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [catalogSelection, setCatalogSelection] = useState<AvatarCatalogSelection | null>(null);
   const [modelError, setModelError] = useState<{
     expressionId: string | null;
     message: string;
@@ -81,9 +83,10 @@ export function AvatarPreview({
   const sceneRef = useRef<HTMLDivElement>(null);
   const currentTimeRef = useRef(0);
 
+  const activeClipId = catalogSelection?.clipId ?? (catalogSelection ? null : expression?.animationClipId ?? null);
   const resolvedClip = useMemo(
-    () => resolveAnimationClip(clips, expression?.animationClipId ?? null),
-    [clips, expression?.animationClipId],
+    () => resolveAnimationClip(clips, activeClipId),
+    [clips, activeClipId],
   );
   const selectedClip = resolvedClip ?? "";
   const duration = resolvedClip ? (durations[resolvedClip] ?? 0) : 0;
@@ -94,9 +97,9 @@ export function AvatarPreview({
       : "";
   const canLoadConfiguredModel = Boolean(
     CONFIGURED_MODEL_URL &&
-      expression?.animationClipId &&
+      activeClipId &&
       (CONFIGURED_MODEL_URL !== BUNDLED_AVATAR_URL ||
-        expression.animationClipId === "HOLA"),
+        activeClipId === "HOLA" || activeClipId.startsWith("QA_DACTILO_")),
   );
   const isLoadingModel = hasModel && !clipsLoaded && !modelError;
 
@@ -144,7 +147,7 @@ export function AvatarPreview({
     (names: string[]) => {
       const nextClip = resolveAnimationClip(
         names,
-        expression?.animationClipId ?? null,
+        activeClipId,
       );
       setClips(names);
       setClipsLoaded(true);
@@ -154,7 +157,7 @@ export function AvatarPreview({
       setCurrentTime(0);
       currentTimeRef.current = 0;
     },
-    [expression?.animationClipId, onClipsLoaded],
+    [activeClipId, onClipsLoaded],
   );
 
   const handleClipDurations = useCallback((next: Record<string, number>) => {
@@ -229,6 +232,18 @@ export function AvatarPreview({
     setRestartToken((value) => value + 1);
   }
 
+  function selectCatalogItem(selection: AvatarCatalogSelection) {
+    setCatalogSelection(selection);
+    setCurrentTime(0);
+    currentTimeRef.current = 0;
+    setRestartToken((value) => value + 1);
+    const found = resolveAnimationClip(clips, selection.clipId);
+    setIsPlaying(Boolean(found));
+    if (!modelUrl && CONFIGURED_MODEL_URL && (CONFIGURED_MODEL_URL !== BUNDLED_AVATAR_URL || selection.availableInBundledModel)) {
+      loadConfiguredModel();
+    }
+  }
+
   function openPreview() {
     if (!modelUrl && canLoadConfiguredModel) loadConfiguredModel();
     setDialogOpen(true);
@@ -254,6 +269,8 @@ export function AvatarPreview({
     if (!dialogOpen || !canLoadConfiguredModel || hasModel || activeModelError) {
       return;
     }
+    // The shared catalog can select an expression after the modal is open.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadConfiguredModel();
   }, [activeModelError, canLoadConfiguredModel, dialogOpen, hasModel, loadConfiguredModel]);
 
@@ -267,7 +284,7 @@ export function AvatarPreview({
     statusMessage =
       CONFIGURED_MODEL_URL === BUNDLED_AVATAR_URL
         ? (isDraftMatch ? "Coincidencia exacta: «Hola»." : "Clip de «Hola» disponible.") +
-          " El modelo se carga bajo demanda (6.05 MB)."
+          " El modelo se carga bajo demanda (6.98 MB)."
         : (isDraftMatch
             ? "Coincidencia exacta del catálogo."
             : "Expresión seleccionada del catálogo.") +
@@ -370,7 +387,7 @@ export function AvatarPreview({
 
       <Dialog
         open={dialogOpen}
-        onOpenChange={setDialogOpen}
+        onOpenChange={(open) => { setDialogOpen(open); if (!open) setCatalogSelection(null); }}
         title="Vista 3D de respuesta"
         description={
           expression
@@ -505,7 +522,11 @@ export function AvatarPreview({
             className="avatar-modal-status"
             role={activeModelError ? "alert" : "status"}
           >
-            {statusMessage}
+            {catalogSelection
+              ? resolvedClip
+                ? `${catalogSelection.label}: clip provisional disponible; requiere revisión lingüística.`
+                : isLoadingModel ? "Cargando el modelo 3D…" : `${catalogSelection.label}: no hay clip disponible en este modelo.`
+              : statusMessage}
           </p>
           {fileError ? (
             <p className="field-error" role="alert">
@@ -516,11 +537,14 @@ export function AvatarPreview({
             <p className="help-text">El GLB cargó, pero no contiene animaciones.</p>
           ) : null}
           </div>
-          {dialogCatalog ? (
-            <aside className="avatar-modal-catalog" aria-label="Catálogo LSB">
-              {dialogCatalog}
-            </aside>
-          ) : null}
+          <aside className="avatar-modal-catalog" aria-label="Catálogo LSB">
+            {dialogCatalog ? (
+              <div onSubmitCapture={() => setCatalogSelection(null)} onClickCapture={(event) => {
+                if ((event.target as HTMLElement).closest("button")) setCatalogSelection(null);
+              }}>{dialogCatalog}</div>
+            ) : null}
+            <AvatarClipCatalog clips={clipsLoaded ? clips : null} selectedClipId={activeClipId} onSelect={selectCatalogItem} studyOnly={Boolean(dialogCatalog)} />
+          </aside>
         </div>
       </Dialog>
       <input
